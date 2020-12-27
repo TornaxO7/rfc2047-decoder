@@ -154,3 +154,16 @@ mod parser_tests {
         );
     }
 }
+
+pub fn decode(encoded_str: &str) -> String {
+    let tokens = crate::lexer::run(encoded_str);
+    crate::parser::run(&tokens)
+}
+
+#[test]
+fn decode_iso_8859_1_q() {
+    assert_eq!(
+        "decoded = text".to_string(),
+        decode("=?iso-8859-1?Q?decoded_=3D_text?=")
+    );
+}

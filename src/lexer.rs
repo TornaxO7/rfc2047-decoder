@@ -1,3 +1,5 @@
+use std::{fmt, result};
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     Charset(Vec<u8>),
@@ -22,6 +24,24 @@ pub enum Error {
     EncodedTextStructureError,
 }
 
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::CharsetStructureError => {
+                write!(f, "the charset section is invalid or not terminated")
+            }
+            Error::EncodingStructureError => {
+                write!(f, "the encoding section is invalid or not terminated")
+            }
+            Error::EncodedTextStructureError => {
+                write!(f, "the encoded text section is invalid or not terminated")
+            }
+        }
+    }
+}
+
+type Result<T> = result::Result<T, Error>;
+
 fn append_char_to_bytes(bytes: &mut Vec<u8>, c: char) {
     let mut buff: [u8; 4] = [0; 4];
     c.encode_utf8(&mut buff);
@@ -29,7 +49,7 @@ fn append_char_to_bytes(bytes: &mut Vec<u8>, c: char) {
     bytes.append(&mut char_as_vec);
 }
 
-pub fn run(encoded_str: &str) -> Result<Tokens, Error> {
+pub fn run(encoded_str: &str) -> Result<Tokens> {
     use crate::lexer::State::*;
 
     let mut encoded_chars = encoded_str.chars();
@@ -114,86 +134,85 @@ pub fn run(encoded_str: &str) -> Result<Tokens, Error> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use crate::lexer::*;
 
     // Charset token test utilities
-    fn charset(s: &str) -> Token {
+    pub fn charset(s: &str) -> Token {
         Token::Charset(s.as_bytes().to_vec())
     }
 
     // Encoding token test utilities
-    fn encoding(s: &str) -> Token {
+    pub fn encoding(s: &str) -> Token {
         Token::Encoding(s.as_bytes().to_vec())
     }
 
     // Encoded text token test utilities
-    fn encoded_text(s: &str) -> Token {
+    pub fn encoded_text(s: &str) -> Token {
         Token::EncodedText(s.as_bytes().to_vec())
     }
 
     // Raw text token test utilities
-    fn raw_text(s: &str) -> Token {
+    pub fn raw_text(s: &str) -> Token {
         Token::RawText(s.as_bytes().to_vec())
     }
 
-    // Vec<Token> test utilities
-    fn tokens(tokens: &[Token]) -> Result<Tokens, Error> {
-        Ok(tokens.to_vec())
+    fn assert_ok(tokens: &[Token], s: &str) {
+        assert_eq!(run(s).unwrap(), tokens.to_vec())
     }
 
     #[test]
     fn empty_str() {
-        assert_eq!(tokens(&[]), run(""));
+        assert_ok(&[], "")
     }
 
     #[test]
     fn decoded_text_only() {
-        assert_eq!(tokens(&[raw_text("decoded string")]), run("decoded string"));
+        assert_ok(&[raw_text("decoded string")], "decoded string")
     }
 
     #[test]
     fn decoded_text_except() {
-        assert_eq!(
-            tokens(&[
+        assert_ok(
+            &[
                 charset("charset"),
                 encoding("encoding"),
                 encoded_text("encoded-text"),
-            ]),
-            run("=?charset?encoding?encoded-text?=")
-        );
+            ],
+            "=?charset?encoding?encoded-text?=",
+        )
     }
 
     #[test]
     fn decoded_text_before() {
-        assert_eq!(
-            tokens(&[
+        assert_ok(
+            &[
                 raw_text("decoded-text"),
                 charset("charset"),
                 encoding("encoding"),
                 encoded_text("encoded-text"),
-            ]),
-            run("decoded-text=?charset?encoding?encoded-text?=")
-        );
+            ],
+            "decoded-text=?charset?encoding?encoded-text?=",
+        )
     }
 
     #[test]
     fn decoded_text_after() {
-        assert_eq!(
-            tokens(&[
+        assert_ok(
+            &[
                 charset("charset"),
                 encoding("encoding"),
                 encoded_text("encoded-text"),
                 raw_text("decoded-text"),
-            ]),
-            run("=?charset?encoding?encoded-text?=decoded-text")
-        );
+            ],
+            "=?charset?encoding?encoded-text?=decoded-text",
+        )
     }
 
     #[test]
     fn decoded_text_between() {
-        assert_eq!(
-            tokens(&[
+        assert_ok(
+            &[
                 charset("charset"),
                 encoding("encoding"),
                 encoded_text("encoded-text"),
@@ -201,35 +220,35 @@ mod tests {
                 charset("charset"),
                 encoding("encoding"),
                 encoded_text("encoded-text"),
-            ]),
-            run("=?charset?encoding?encoded-text?=decoded-text=?charset?encoding?encoded-text?=")
-        );
+            ],
+            "=?charset?encoding?encoded-text?=decoded-text=?charset?encoding?encoded-text?=",
+        )
     }
 
     #[test]
     fn empty_encoded_text() {
-        assert_eq!(
-            tokens(&[
+        assert_ok(
+            &[
                 raw_text("decoded-text"),
                 charset("charset"),
                 encoding("encoding"),
                 encoded_text(""),
-            ]),
-            run("decoded-text=?charset?encoding??=")
-        );
+            ],
+            "decoded-text=?charset?encoding??=",
+        )
     }
 
     #[test]
     fn encoded_text_with_question_mark() {
-        assert_eq!(
-            tokens(&[
+        assert_ok(
+            &[
                 raw_text("decoded-text"),
                 charset("charset"),
                 encoding("encoding"),
                 encoded_text("encoded?text"),
-            ]),
-            run("decoded-text=?charset?encoding?encoded?text?=")
-        );
+            ],
+            "decoded-text=?charset?encoding?encoded?text?=",
+        )
     }
 
     #[test]

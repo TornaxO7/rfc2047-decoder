@@ -46,11 +46,66 @@ pub fn run(tokens: &Vec<Token>) -> String {
 
                 decoded_text.push_str(&cow.into_owned());
             }
-            Token::DecodedText(decoded_bytes) => {
+            Token::RawText(decoded_bytes) => {
                 decoded_text.push_str(std::str::from_utf8(&decoded_bytes).unwrap());
             }
         }
     }
 
     decoded_text
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::lexer::Token;
+    use crate::parser::*;
+
+    #[test]
+    fn empty_tokens() {
+        assert_eq!("".to_string(), run(&vec![] as &Vec<Token>));
+    }
+
+    #[test]
+    fn decoded_text_only() {
+        assert_eq!(
+            "decoded-text".to_string(),
+            run(&vec![Token::RawText("decoded-text".as_bytes().to_vec())])
+        );
+    }
+
+    #[test]
+    fn utf_8_q() {
+        assert_eq!(
+            "decoded-text".to_string(),
+            run(&vec![
+                Token::Charset("utf-8".as_bytes().to_vec()),
+                Token::Encoding("Q".as_bytes().to_vec()),
+                Token::EncodedText("decoded-text".as_bytes().to_vec())
+            ])
+        );
+    }
+
+    #[test]
+    fn utf_8_b() {
+        assert_eq!(
+            "decoded-text".to_string(),
+            run(&vec![
+                Token::Charset("utf-8".as_bytes().to_vec()),
+                Token::Encoding("B".as_bytes().to_vec()),
+                Token::EncodedText("ZGVjb2RlZC10ZXh0".as_bytes().to_vec())
+            ])
+        );
+    }
+
+    #[test]
+    fn iso_8858_1_q() {
+        assert_eq!(
+            "decoded = text".to_string(),
+            run(&vec![
+                Token::Charset("iso-8859-1".as_bytes().to_vec()),
+                Token::Encoding("q".as_bytes().to_vec()),
+                Token::EncodedText("decoded_=3D_text".as_bytes().to_vec())
+            ])
+        );
+    }
 }

@@ -1,8 +1,13 @@
+#![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.1.0")]
+
 use std::{error, fmt, result};
 
 mod lexer;
 mod parser;
 
+/// Errors can come from the lexer or the parser.
+/// Lexer errors are related to invalid syntaxes.
+/// Parser errors are related to decoding issues.
 #[derive(Debug)]
 pub enum Error {
     RunLexerError(lexer::Error),
@@ -36,8 +41,27 @@ impl From<parser::Error> for Error {
     }
 }
 
+/// Wrapper around `std::result::Result`.
 pub type Result<T> = result::Result<T, Error>;
 
+/// Decode a RFC 2047 MIME Message Header.
+///
+/// ```rust
+/// use rfc2047_decoder;
+///
+/// fn main() -> rfc2047_decoder::Result<()> {
+///     let encoded_str = "=?UTF-8?Q?encoded_str_with_symbol_=E2=82=AC?=";
+///     let decoded_str = "encoded str with symbol €";
+///
+///     assert_eq!(rfc2047_decoder::decode(encoded_str)?, decoded_str);
+///     Ok(())
+/// }
+/// ```
+///
+/// # Errors
+///
+/// The function can return an error if the lexer or
+/// the parser encounters an error.
 pub fn decode(encoded_str: &str) -> Result<String> {
     let tokens = crate::lexer::run(encoded_str)?;
     let decoded_str = crate::parser::run(&tokens)?;

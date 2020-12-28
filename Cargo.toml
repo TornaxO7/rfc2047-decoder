@@ -1,15 +1,15 @@
 [package]
 name = "rfc2047-decoder"
 description = "Simple RFC 2047 MIME Message Headers decoder."
-version = "0.1.0"
+version = "0.1.0" # remember to update html_root_url
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
 repository = "https://github.com/soywod/rfc2047-decoder"
 documentation = "https://github.com/soywod/rfc2047-decoder"
 homepage = "https://github.com/soywod/rfc2047-decoder"
 categories = ["email", "encoding", "parsing", "parser-implementations"]
-keywords = ["lib", "rfc", "rfc2047", "mime", "header", "decoder", "decode", "decoding"]
-license = "BSD-3-Clause License"
+keywords = ["rfc2047", "mime", "header", "decoder", "decoding"]
+license = "BSD-3-Clause"
 readme = "README.md"
 
 [lib]

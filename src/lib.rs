@@ -5,15 +5,15 @@ mod parser;
 
 #[derive(Debug)]
 pub enum Error {
-    LexerError(lexer::Error),
-    ParserError(parser::Error),
+    RunLexerError(lexer::Error),
+    RunParserError(parser::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::LexerError(err) => err.fmt(f),
-            Error::ParserError(err) => err.fmt(f),
+            Error::RunLexerError(err) => err.fmt(f),
+            Error::RunParserError(err) => err.fmt(f),
         }
     }
 }
@@ -26,13 +26,13 @@ impl error::Error for Error {
 
 impl From<lexer::Error> for Error {
     fn from(err: lexer::Error) -> Error {
-        Error::LexerError(err)
+        Error::RunLexerError(err)
     }
 }
 
 impl From<parser::Error> for Error {
     fn from(err: parser::Error) -> Error {
-        Error::ParserError(err)
+        Error::RunParserError(err)
     }
 }
 

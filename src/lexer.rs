@@ -17,23 +17,23 @@ enum State {
     RawText,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Error {
-    CharsetStructureError,
-    EncodingStructureError,
-    EncodedTextStructureError,
+    ParseCharsetError,
+    ParseEncodingError,
+    ParseEncodedTextError,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::CharsetStructureError => {
+            Error::ParseCharsetError => {
                 write!(f, "the charset section is invalid or not terminated")
             }
-            Error::EncodingStructureError => {
+            Error::ParseEncodingError => {
                 write!(f, "the encoding section is invalid or not terminated")
             }
-            Error::EncodedTextStructureError => {
+            Error::ParseEncodedTextError => {
                 write!(f, "the encoded text section is invalid or not terminated")
             }
         }
@@ -67,7 +67,7 @@ pub fn run(encoded_str: &str) -> Result<Tokens> {
                     buffer.clear();
                 }
                 Some(c) => append_char_to_bytes(&mut buffer, c),
-                None => return Err(Error::CharsetStructureError),
+                None => return Err(Error::ParseCharsetError),
             },
             Encoding => match curr_char {
                 Some('?') => {
@@ -76,7 +76,7 @@ pub fn run(encoded_str: &str) -> Result<Tokens> {
                     buffer.clear();
                 }
                 Some(c) => append_char_to_bytes(&mut buffer, c),
-                None => return Err(Error::EncodingStructureError),
+                None => return Err(Error::ParseEncodingError),
             },
             EncodedText => match curr_char {
                 Some('?') => {
@@ -95,7 +95,7 @@ pub fn run(encoded_str: &str) -> Result<Tokens> {
                     }
                 }
                 Some(c) => append_char_to_bytes(&mut buffer, c),
-                None => return Err(Error::EncodedTextStructureError),
+                None => return Err(Error::ParseEncodedTextError),
             },
             RawText => match curr_char {
                 Some('=') => {
@@ -157,23 +157,23 @@ pub mod tests {
         Token::RawText(s.as_bytes().to_vec())
     }
 
-    fn assert_ok(tokens: &[Token], s: &str) {
+    fn assert_tokens_ok(tokens: &[Token], s: &str) {
         assert_eq!(run(s).unwrap(), tokens.to_vec())
     }
 
     #[test]
     fn empty_str() {
-        assert_ok(&[], "")
+        assert_tokens_ok(&[], "")
     }
 
     #[test]
     fn decoded_text_only() {
-        assert_ok(&[raw_text("decoded string")], "decoded string")
+        assert_tokens_ok(&[raw_text("decoded string")], "decoded string")
     }
 
     #[test]
     fn decoded_text_except() {
-        assert_ok(
+        assert_tokens_ok(
             &[
                 charset("charset"),
                 encoding("encoding"),
@@ -185,7 +185,7 @@ pub mod tests {
 
     #[test]
     fn decoded_text_before() {
-        assert_ok(
+        assert_tokens_ok(
             &[
                 raw_text("decoded-text"),
                 charset("charset"),
@@ -198,7 +198,7 @@ pub mod tests {
 
     #[test]
     fn decoded_text_after() {
-        assert_ok(
+        assert_tokens_ok(
             &[
                 charset("charset"),
                 encoding("encoding"),
@@ -211,7 +211,7 @@ pub mod tests {
 
     #[test]
     fn decoded_text_between() {
-        assert_ok(
+        assert_tokens_ok(
             &[
                 charset("charset"),
                 encoding("encoding"),
@@ -227,7 +227,7 @@ pub mod tests {
 
     #[test]
     fn empty_encoded_text() {
-        assert_ok(
+        assert_tokens_ok(
             &[
                 raw_text("decoded-text"),
                 charset("charset"),
@@ -240,7 +240,7 @@ pub mod tests {
 
     #[test]
     fn encoded_text_with_question_mark() {
-        assert_ok(
+        assert_tokens_ok(
             &[
                 raw_text("decoded-text"),
                 charset("charset"),
@@ -253,22 +253,25 @@ pub mod tests {
 
     #[test]
     fn invalid_charset_structure() {
-        assert_eq!(Err(Error::CharsetStructureError), run("=?charset"));
+        assert!(match run("=?charset") {
+            Err(Error::ParseCharsetError) => true,
+            _ => false,
+        });
     }
 
     #[test]
     fn invalid_encoding_structure() {
-        assert_eq!(
-            Err(Error::EncodingStructureError),
-            run("=?charset?encoding")
-        );
+        assert!(match run("=?charset?encoding") {
+            Err(Error::ParseEncodingError) => true,
+            _ => false,
+        });
     }
 
     #[test]
     fn invalid_encoded_text_structure() {
-        assert_eq!(
-            Err(Error::EncodedTextStructureError),
-            run("=?charset?encoding?encoded-text")
-        );
+        assert!(match run("=?charset?encoding?encoded-text") {
+            Err(Error::ParseEncodedTextError) => true,
+            _ => false,
+        });
     }
 }

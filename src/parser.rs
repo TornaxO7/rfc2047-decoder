@@ -7,17 +7,17 @@ use crate::lexer::Tokens;
 
 #[derive(Debug)]
 pub enum Error {
-    Utf8DecodingError(str::Utf8Error),
-    Base64DecodingError(base64::DecodeError),
-    QuotedPrintableDecodingError(quoted_printable::QuotedPrintableError),
+    DecodeUtf8Error(str::Utf8Error),
+    DecodeBase64Error(base64::DecodeError),
+    DecodeQuotedPrintableError(quoted_printable::QuotedPrintableError),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Utf8DecodingError(err) => err.fmt(f),
-            Error::Base64DecodingError(err) => err.fmt(f),
-            Error::QuotedPrintableDecodingError(err) => err.fmt(f),
+            Error::DecodeUtf8Error(err) => err.fmt(f),
+            Error::DecodeBase64Error(err) => err.fmt(f),
+            Error::DecodeQuotedPrintableError(err) => err.fmt(f),
         }
     }
 }
@@ -25,28 +25,28 @@ impl fmt::Display for Error {
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
-            Error::Utf8DecodingError(ref err) => Some(err),
-            Error::Base64DecodingError(ref err) => Some(err),
-            Error::QuotedPrintableDecodingError(ref err) => Some(err),
+            Error::DecodeUtf8Error(ref err) => Some(err),
+            Error::DecodeBase64Error(ref err) => Some(err),
+            Error::DecodeQuotedPrintableError(ref err) => Some(err),
         }
     }
 }
 
 impl From<str::Utf8Error> for Error {
     fn from(err: str::Utf8Error) -> Error {
-        Error::Utf8DecodingError(err)
+        Error::DecodeUtf8Error(err)
     }
 }
 
 impl From<base64::DecodeError> for Error {
     fn from(err: base64::DecodeError) -> Error {
-        Error::Base64DecodingError(err)
+        Error::DecodeBase64Error(err)
     }
 }
 
 impl From<quoted_printable::QuotedPrintableError> for Error {
     fn from(err: quoted_printable::QuotedPrintableError) -> Error {
-        Error::QuotedPrintableDecodingError(err)
+        Error::DecodeQuotedPrintableError(err)
     }
 }
 
@@ -127,23 +127,23 @@ mod tests {
     use crate::lexer::{tests::*, Token};
     use crate::parser::*;
 
-    fn assert_ok(s: &str, tokens: &[Token]) {
+    fn assert_parsing_ok(s: &str, tokens: &[Token]) {
         assert_eq!(s.to_string(), run(&tokens.to_vec()).unwrap());
     }
 
     #[test]
     fn empty_tokens() {
-        assert_ok("", &[])
+        assert_parsing_ok("", &[])
     }
 
     #[test]
     fn decoded_text_only() {
-        assert_ok("decoded-text", &[raw_text("decoded-text")]);
+        assert_parsing_ok("decoded-text", &[raw_text("decoded-text")]);
     }
 
     #[test]
     fn utf_8_q() {
-        assert_ok(
+        assert_parsing_ok(
             "decoded-text",
             &[
                 charset("utf-8"),
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn utf_8_b() {
-        assert_ok(
+        assert_parsing_ok(
             "decoded-text",
             &[
                 charset("utf-8"),
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn iso_8858_1_q() {
-        assert_ok(
+        assert_parsing_ok(
             "decoded = text",
             &[
                 charset("iso-8859-1"),

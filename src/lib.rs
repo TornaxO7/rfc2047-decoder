@@ -46,13 +46,26 @@ pub fn decode(encoded_str: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::decode;
+    use crate::{decode, Result};
+
+    fn assert_decode_ok(decoded_str: &str, encoded_str: &str) -> Result<()> {
+        assert_eq!(decode(encoded_str)?, decoded_str);
+        Ok(())
+    }
 
     #[test]
-    fn decode_iso_8859_1_q() {
-        assert_eq!(
-            "decoded = text".to_string(),
-            decode("=?iso-8859-1?Q?decoded_=3D_text?=").unwrap()
-        );
+    fn utf8_q() -> Result<()> {
+        assert_decode_ok(
+            "encoded str with symbol €",
+            "=?UTF-8?Q?encoded_str_with_symbol_=E2=82=AC?=",
+        )
+    }
+
+    #[test]
+    fn utf8_b() -> Result<()> {
+        assert_decode_ok(
+            "encoded str with symbol €",
+            "=?UTF-8?B?ZW5jb2RlZCBzdHIgd2l0aCBzeW1ib2wg4oKs?=",
+        )
     }
 }

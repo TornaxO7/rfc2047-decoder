@@ -1,13 +1,14 @@
 # rfc2047-decoder
 
-Simple [Rust](https://www.rust-lang.org/) library that decodes [RFC 2047 MIME
-Message Headers](https://tools.ietf.org/html/rfc2047).
+Simple [RFC 2047 MIME Message Header](https://tools.ietf.org/html/rfc2047)
+decoder library for [Rust](https://www.rust-lang.org/).
 
 ## Installation
 
 Add `rfc2047-decoder` to your `Cargo.toml`:
 
 ```toml
+[dependencies]
 rfc2047-decoder = "0.1.0"
 ```
 

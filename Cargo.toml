@@ -1,11 +1,11 @@
 [package]
 name = "rfc2047-decoder"
-description = "Simple RFC 2047 MIME Message Headers decoder."
+description = "Simple RFC 2047 MIME Message Header decoder"
 version = "0.1.0" # remember to update html_root_url
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
 repository = "https://github.com/soywod/rfc2047-decoder"
-documentation = "https://github.com/soywod/rfc2047-decoder"
+documentation = "https://docs.rs/rfc2047-decoder"
 homepage = "https://github.com/soywod/rfc2047-decoder"
 categories = ["email", "encoding", "parsing", "parser-implementations"]
 keywords = ["rfc2047", "mime", "header", "decoder", "decoding"]

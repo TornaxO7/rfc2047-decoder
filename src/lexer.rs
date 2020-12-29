@@ -1,11 +1,13 @@
 use std::{fmt, result};
 
+use crate::lexer::State::*;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     Charset(Vec<u8>),
     Encoding(Vec<u8>),
     EncodedText(Vec<u8>),
-    RawText(Vec<u8>),
+    ClearText(Vec<u8>),
 }
 
 pub type Tokens = Vec<Token>;
@@ -14,7 +16,7 @@ enum State {
     Charset,
     Encoding,
     EncodedText,
-    RawText,
+    ClearText,
 }
 
 #[derive(Debug)]
@@ -50,12 +52,10 @@ fn append_char_to_bytes(bytes: &mut Vec<u8>, c: char) {
 }
 
 pub fn run(encoded_str: &str) -> Result<Tokens> {
-    use crate::lexer::State::*;
-
     let mut encoded_chars = encoded_str.chars();
     let mut curr_char = encoded_chars.next();
     let mut tokens = vec![];
-    let mut state = State::RawText;
+    let mut state = State::ClearText;
     let mut buffer: Vec<u8> = vec![];
 
     loop {
@@ -84,7 +84,7 @@ pub fn run(encoded_str: &str) -> Result<Tokens> {
 
                     match curr_char {
                         Some('=') => {
-                            state = RawText;
+                            state = ClearText;
                             tokens.push(Token::EncodedText(buffer.clone()));
                             buffer.clear();
                         }
@@ -97,7 +97,7 @@ pub fn run(encoded_str: &str) -> Result<Tokens> {
                 Some(c) => append_char_to_bytes(&mut buffer, c),
                 None => return Err(Error::ParseEncodedTextError),
             },
-            RawText => match curr_char {
+            ClearText => match curr_char {
                 Some('=') => {
                     curr_char = encoded_chars.next();
 
@@ -106,7 +106,7 @@ pub fn run(encoded_str: &str) -> Result<Tokens> {
                             state = Charset;
 
                             if !buffer.is_empty() {
-                                tokens.push(Token::RawText(buffer.clone()));
+                                tokens.push(Token::ClearText(buffer.clone()));
                                 buffer.clear()
                             }
                         }
@@ -119,7 +119,7 @@ pub fn run(encoded_str: &str) -> Result<Tokens> {
                 Some(c) => append_char_to_bytes(&mut buffer, c),
                 None => {
                     if !buffer.is_empty() {
-                        tokens.push(Token::RawText(buffer.clone()));
+                        tokens.push(Token::ClearText(buffer.clone()));
                     }
 
                     break;
@@ -135,143 +135,12 @@ pub fn run(encoded_str: &str) -> Result<Tokens> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::lexer::*;
-
-    // Charset token test utilities
-    pub fn charset(s: &str) -> Token {
-        Token::Charset(s.as_bytes().to_vec())
-    }
-
-    // Encoding token test utilities
-    pub fn encoding(s: &str) -> Token {
-        Token::Encoding(s.as_bytes().to_vec())
-    }
-
-    // Encoded text token test utilities
-    pub fn encoded_text(s: &str) -> Token {
-        Token::EncodedText(s.as_bytes().to_vec())
-    }
-
-    // Raw text token test utilities
-    pub fn raw_text(s: &str) -> Token {
-        Token::RawText(s.as_bytes().to_vec())
-    }
-
-    fn assert_tokens_ok(tokens: &[Token], s: &str) {
-        assert_eq!(run(s).unwrap(), tokens.to_vec())
-    }
+    use crate::lexer;
 
     #[test]
-    fn empty_str() {
-        assert_tokens_ok(&[], "")
-    }
-
-    #[test]
-    fn decoded_text_only() {
-        assert_tokens_ok(&[raw_text("decoded string")], "decoded string")
-    }
-
-    #[test]
-    fn decoded_text_except() {
-        assert_tokens_ok(
-            &[
-                charset("charset"),
-                encoding("encoding"),
-                encoded_text("encoded-text"),
-            ],
-            "=?charset?encoding?encoded-text?=",
-        )
-    }
-
-    #[test]
-    fn decoded_text_before() {
-        assert_tokens_ok(
-            &[
-                raw_text("decoded-text"),
-                charset("charset"),
-                encoding("encoding"),
-                encoded_text("encoded-text"),
-            ],
-            "decoded-text=?charset?encoding?encoded-text?=",
-        )
-    }
-
-    #[test]
-    fn decoded_text_after() {
-        assert_tokens_ok(
-            &[
-                charset("charset"),
-                encoding("encoding"),
-                encoded_text("encoded-text"),
-                raw_text("decoded-text"),
-            ],
-            "=?charset?encoding?encoded-text?=decoded-text",
-        )
-    }
-
-    #[test]
-    fn decoded_text_between() {
-        assert_tokens_ok(
-            &[
-                charset("charset"),
-                encoding("encoding"),
-                encoded_text("encoded-text"),
-                raw_text("decoded-text"),
-                charset("charset"),
-                encoding("encoding"),
-                encoded_text("encoded-text"),
-            ],
-            "=?charset?encoding?encoded-text?=decoded-text=?charset?encoding?encoded-text?=",
-        )
-    }
-
-    #[test]
-    fn empty_encoded_text() {
-        assert_tokens_ok(
-            &[
-                raw_text("decoded-text"),
-                charset("charset"),
-                encoding("encoding"),
-                encoded_text(""),
-            ],
-            "decoded-text=?charset?encoding??=",
-        )
-    }
-
-    #[test]
-    fn encoded_text_with_question_mark() {
-        assert_tokens_ok(
-            &[
-                raw_text("decoded-text"),
-                charset("charset"),
-                encoding("encoding"),
-                encoded_text("encoded?text"),
-            ],
-            "decoded-text=?charset?encoding?encoded?text?=",
-        )
-    }
-
-    #[test]
-    fn invalid_charset_structure() {
-        assert!(match run("=?charset") {
-            Err(Error::ParseCharsetError) => true,
-            _ => false,
-        });
-    }
-
-    #[test]
-    fn invalid_encoding_structure() {
-        assert!(match run("=?charset?encoding") {
-            Err(Error::ParseEncodingError) => true,
-            _ => false,
-        });
-    }
-
-    #[test]
-    fn invalid_encoded_text_structure() {
-        assert!(match run("=?charset?encoding?encoded-text") {
-            Err(Error::ParseEncodedTextError) => true,
-            _ => false,
-        });
+    fn append_char_to_bytes() {
+        let mut buff: Vec<u8> = vec![];
+        lexer::append_char_to_bytes(&mut buff, 'a');
+        assert_eq!(vec![97], buff)
     }
 }

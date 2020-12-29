@@ -2,16 +2,18 @@
 
 use std::{error, fmt, result};
 
+mod evaluator;
 mod lexer;
 mod parser;
 
 /// Errors can come from the lexer or the parser.
 /// Lexer errors are related to invalid syntaxes.
-/// Parser errors are related to decoding issues.
+/// Parser and Evaluator errors are related to decoding issues.
 #[derive(Debug)]
 pub enum Error {
     RunLexerError(lexer::Error),
     RunParserError(parser::Error),
+    RunEvaluatorError(evaluator::Error),
 }
 
 impl fmt::Display for Error {
@@ -19,6 +21,7 @@ impl fmt::Display for Error {
         match self {
             Error::RunLexerError(err) => err.fmt(f),
             Error::RunParserError(err) => err.fmt(f),
+            Error::RunEvaluatorError(err) => err.fmt(f),
         }
     }
 }
@@ -41,55 +44,113 @@ impl From<parser::Error> for Error {
     }
 }
 
+impl From<evaluator::Error> for Error {
+    fn from(err: evaluator::Error) -> Error {
+        Error::RunEvaluatorError(err)
+    }
+}
+
 /// Wrapper around `std::result::Result`.
 pub type Result<T> = result::Result<T, Error>;
 
 /// Decode a RFC 2047 MIME Message Header.
 ///
 /// ```rust
-/// use rfc2047_decoder;
-///
-/// fn main() -> rfc2047_decoder::Result<()> {
-///     let encoded_str = "=?UTF-8?Q?encoded_str_with_symbol_=E2=82=AC?=";
-///     let decoded_str = "encoded str with symbol €";
-///
-///     assert_eq!(rfc2047_decoder::decode(encoded_str)?, decoded_str);
-///     Ok(())
+/// fn main() {
+///     match rfc2047_decoder::decode("=?utf8?q?str_with_spaces?=") {
+///         Ok(s) => println!("{}", s),
+///         Err(err) => panic!(err),
+///     }
 /// }
 /// ```
 ///
 /// # Errors
 ///
-/// The function can return an error if the lexer or
-/// the parser encounters an error.
+/// The function can return an error if the lexer,
+/// the parser or the evaluator encounters an error.
 pub fn decode(encoded_str: &str) -> Result<String> {
-    let tokens = crate::lexer::run(encoded_str)?;
-    let decoded_str = crate::parser::run(&tokens)?;
+    let tokens = lexer::run(encoded_str)?;
+    let ats = parser::run(&tokens)?;
+    let decoded_str = evaluator::run(&ats)?;
+
     Ok(decoded_str)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{decode, Result};
+    use crate::decode;
 
-    fn assert_decode_ok(decoded_str: &str, encoded_str: &str) -> Result<()> {
-        assert_eq!(decode(encoded_str)?, decoded_str);
-        Ok(())
+    fn assert_ok(decoded_str: &str, encoded_str: &str) {
+        assert!(if let Ok(s) = decode(encoded_str) {
+            s == decoded_str
+        } else {
+            false
+        });
     }
 
     #[test]
-    fn utf8_q() -> Result<()> {
-        assert_decode_ok(
-            "encoded str with symbol €",
-            "=?UTF-8?Q?encoded_str_with_symbol_=E2=82=AC?=",
-        )
+    fn clear_empty() {
+        assert_ok("", "");
     }
 
     #[test]
-    fn utf8_b() -> Result<()> {
-        assert_decode_ok(
-            "encoded str with symbol €",
-            "=?UTF-8?B?ZW5jb2RlZCBzdHIgd2l0aCBzeW1ib2wg4oKs?=",
-        )
+    fn clear_with_str() {
+        assert_ok("str", "str");
+    }
+
+    #[test]
+    fn clear_with_spaces() {
+        assert_ok("str with spaces", "str with spaces");
+    }
+
+    #[test]
+    fn utf8_qs_empty() {
+        assert_ok("", "=?UTF-8?Q??=");
+    }
+
+    #[test]
+    fn utf8_qs_with_str() {
+        assert_ok("str", "=?UTF-8?Q?str?=");
+    }
+
+    #[test]
+    fn utf8_qs_with_spaces() {
+        assert_ok("str with spaces", "=?utf8?q?str_with_spaces?=");
+    }
+
+    #[test]
+    fn utf8_qs_with_spec_chars() {
+        assert_ok(
+            "str with special çhàrß",
+            "=?utf8?q?str_with_special_=C3=A7h=C3=A0r=C3=9F?=",
+        );
+    }
+
+    #[test]
+    fn utf8_qs_double() {
+        assert_ok("strstr", "=?UTF-8?Q?str?=\r\n =?UTF-8?Q?str?=");
+    }
+
+    #[test]
+    fn utf8_b64_empty() {
+        assert_ok("", "=?UTF-8?B??=");
+    }
+
+    #[test]
+    fn utf8_b64_with_str() {
+        assert_ok("str", "=?UTF-8?B?c3Ry?=");
+    }
+
+    #[test]
+    fn utf8_b64_with_spaces() {
+        assert_ok("str with spaces", "=?utf8?b?c3RyIHdpdGggc3BhY2Vz?=");
+    }
+
+    #[test]
+    fn utf8_b64_with_spec_chars() {
+        assert_ok(
+            "str with special çhàrß",
+            "=?utf8?b?c3RyIHdpdGggc3BlY2lhbCDDp2jDoHLDnw==?=",
+        );
     }
 }

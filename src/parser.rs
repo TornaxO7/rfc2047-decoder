@@ -48,8 +48,8 @@ impl From<str::Utf8Error> for Error {
 
 type Result<T> = result::Result<T, Error>;
 
-fn first_char_of(vec: &Vec<u8>) -> Result<char> {
-    match str::from_utf8(&vec)?.to_uppercase().chars().next() {
+fn first_char_of(vec: &[u8]) -> Result<char> {
+    match str::from_utf8(vec)?.to_uppercase().chars().next() {
         Some(c) => Ok(c),
         None => Ok('Q'),
     }
@@ -78,6 +78,7 @@ pub fn run(tokens: &Tokens) -> Result<Ast> {
                 }));
             }
             ClearText(decoded_bytes) => match decoded_bytes[..] {
+                // CRLF + SPACE
                 [13, 10, 32] => (),
                 _ => ast.push(Node::ClearBytes(decoded_bytes.clone())),
             },
@@ -94,11 +95,11 @@ mod tests {
     #[test]
     fn first_char_of() -> parser::Result<()> {
         assert_eq!('Q', parser::first_char_of(&vec![])?);
-        assert_eq!('Q', parser::first_char_of(&"q".as_bytes().to_vec())?);
-        assert_eq!('Q', parser::first_char_of(&"Q".as_bytes().to_vec())?);
-        assert_eq!('B', parser::first_char_of(&"b".as_bytes().to_vec())?);
-        assert_eq!('B', parser::first_char_of(&"B".as_bytes().to_vec())?);
-        assert_eq!('B', parser::first_char_of(&"base64".as_bytes().to_vec())?);
+        assert_eq!('Q', parser::first_char_of(&"q".as_bytes())?);
+        assert_eq!('Q', parser::first_char_of(&"Q".as_bytes())?);
+        assert_eq!('B', parser::first_char_of(&"b".as_bytes())?);
+        assert_eq!('B', parser::first_char_of(&"B".as_bytes())?);
+        assert_eq!('B', parser::first_char_of(&"base64".as_bytes())?);
 
         Ok(())
     }

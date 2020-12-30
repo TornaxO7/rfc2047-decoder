@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.1.1")]
 
 use std::{error, fmt, result};
 
@@ -57,7 +57,7 @@ pub type Result<T> = result::Result<T, Error>;
 ///
 /// ```rust
 /// fn main() {
-///     match rfc2047_decoder::decode("=?utf8?q?str_with_spaces?=") {
+///     match rfc2047_decoder::decode("=?utf8?q?str_with_spaces?=".as_bytes()) {
 ///         Ok(s) => println!("{}", s),
 ///         Err(err) => panic!(err),
 ///     }
@@ -68,8 +68,8 @@ pub type Result<T> = result::Result<T, Error>;
 ///
 /// The function can return an error if the lexer,
 /// the parser or the evaluator encounters an error.
-pub fn decode(encoded_str: &str) -> Result<String> {
-    let tokens = lexer::run(encoded_str)?;
+pub fn decode(encoded_str: &[u8]) -> Result<String> {
+    let tokens = lexer::run(&encoded_str)?;
     let ats = parser::run(&tokens)?;
     let decoded_str = evaluator::run(&ats)?;
 
@@ -81,7 +81,7 @@ mod tests {
     use crate::decode;
 
     fn assert_ok(decoded_str: &str, encoded_str: &str) {
-        assert!(if let Ok(s) = decode(encoded_str) {
+        assert!(if let Ok(s) = decode(encoded_str.as_bytes()) {
             s == decoded_str
         } else {
             false

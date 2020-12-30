@@ -66,6 +66,7 @@ fn decode_quoted_printable(encoded_bytes: &Vec<u8>) -> Result<Vec<u8>> {
     let parse_mode = quoted_printable::ParseMode::Robust;
     let encoded_bytes = encoded_bytes
         .iter()
+        // Replace underscores by spaces
         .map(|b| if *b == 95 { 32 } else { *b })
         .collect::<Vec<_>>();
     let decoded_bytes = quoted_printable::decode(encoded_bytes, parse_mode)?;

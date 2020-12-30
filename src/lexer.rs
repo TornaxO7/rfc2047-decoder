@@ -44,65 +44,61 @@ impl fmt::Display for Error {
 
 type Result<T> = result::Result<T, Error>;
 
-fn append_char_to_bytes(bytes: &mut Vec<u8>, c: char) {
-    let mut buff: [u8; 4] = [0; 4];
-    c.encode_utf8(&mut buff);
-    let mut char_as_vec = buff[0..c.len_utf8()].to_vec();
-    bytes.append(&mut char_as_vec);
-}
-
-pub fn run(encoded_str: &str) -> Result<Tokens> {
-    let mut encoded_chars = encoded_str.chars();
-    let mut curr_char = encoded_chars.next();
+pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
+    let mut encoded_bytes_iter = encoded_bytes.iter();
+    let mut curr_byte = encoded_bytes_iter.next();
     let mut tokens = vec![];
-    let mut state = State::ClearText;
+    let mut state = ClearText;
     let mut buffer: Vec<u8> = vec![];
+
+    // 61 = Equal symbol '='
+    // 63 = Question mark symbol '?'
 
     loop {
         match state {
-            Charset => match curr_char {
-                Some('?') => {
+            Charset => match curr_byte {
+                Some(63) => {
                     state = Encoding;
                     tokens.push(Token::Charset(buffer.clone()));
                     buffer.clear();
                 }
-                Some(c) => append_char_to_bytes(&mut buffer, c),
+                Some(b) => buffer.push(*b),
                 None => return Err(Error::ParseCharsetError),
             },
-            Encoding => match curr_char {
-                Some('?') => {
+            Encoding => match curr_byte {
+                Some(63) => {
                     state = EncodedText;
                     tokens.push(Token::Encoding(buffer.clone()));
                     buffer.clear();
                 }
-                Some(c) => append_char_to_bytes(&mut buffer, c),
+                Some(b) => buffer.push(*b),
                 None => return Err(Error::ParseEncodingError),
             },
-            EncodedText => match curr_char {
-                Some('?') => {
-                    curr_char = encoded_chars.next();
+            EncodedText => match curr_byte {
+                Some(63) => {
+                    curr_byte = encoded_bytes_iter.next();
 
-                    match curr_char {
-                        Some('=') => {
+                    match curr_byte {
+                        Some(61) => {
                             state = ClearText;
                             tokens.push(Token::EncodedText(buffer.clone()));
                             buffer.clear();
                         }
                         _ => {
-                            append_char_to_bytes(&mut buffer, '?');
+                            buffer.push(63);
                             continue;
                         }
                     }
                 }
-                Some(c) => append_char_to_bytes(&mut buffer, c),
+                Some(b) => buffer.push(*b),
                 None => return Err(Error::ParseEncodedTextError),
             },
-            ClearText => match curr_char {
-                Some('=') => {
-                    curr_char = encoded_chars.next();
+            ClearText => match curr_byte {
+                Some(61) => {
+                    curr_byte = encoded_bytes_iter.next();
 
-                    match curr_char {
-                        Some('?') => {
+                    match curr_byte {
+                        Some(63) => {
                             state = Charset;
 
                             if !buffer.is_empty() {
@@ -111,12 +107,12 @@ pub fn run(encoded_str: &str) -> Result<Tokens> {
                             }
                         }
                         _ => {
-                            append_char_to_bytes(&mut buffer, '=');
+                            buffer.push(61);
                             continue;
                         }
                     }
                 }
-                Some(c) => append_char_to_bytes(&mut buffer, c),
+                Some(b) => buffer.push(*b),
                 None => {
                     if !buffer.is_empty() {
                         tokens.push(Token::ClearText(buffer.clone()));
@@ -127,20 +123,8 @@ pub fn run(encoded_str: &str) -> Result<Tokens> {
             },
         }
 
-        curr_char = encoded_chars.next();
+        curr_byte = encoded_bytes_iter.next();
     }
 
     Ok(tokens)
-}
-
-#[cfg(test)]
-pub mod tests {
-    use crate::lexer;
-
-    #[test]
-    fn append_char_to_bytes() {
-        let mut buff: Vec<u8> = vec![];
-        lexer::append_char_to_bytes(&mut buff, 'a');
-        assert_eq!(vec![97], buff)
-    }
 }

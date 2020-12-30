@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.1.1")]
+#![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.1.2")]
 
 use std::{error, fmt, result};
 
@@ -129,6 +129,9 @@ mod tests {
     #[test]
     fn utf8_qs_double() {
         assert_ok("strstr", "=?UTF-8?Q?str?=\r\n =?UTF-8?Q?str?=");
+        assert_ok("strstr", "=?UTF-8?Q?str?=\n =?UTF-8?Q?str?=");
+        assert_ok("strstr", "=?UTF-8?Q?str?= =?UTF-8?Q?str?=");
+        assert_ok("strstr", "=?UTF-8?Q?str?==?UTF-8?Q?str?=");
     }
 
     #[test]

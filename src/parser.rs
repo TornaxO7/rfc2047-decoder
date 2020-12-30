@@ -78,8 +78,12 @@ pub fn run(tokens: &Tokens) -> Result<Ast> {
                 }));
             }
             ClearText(decoded_bytes) => match decoded_bytes[..] {
-                // CRLF + SPACE
+                // CRLF + Space
                 [13, 10, 32] => (),
+                // LF + Space
+                [10, 32] => (),
+                // Space
+                [32] => (),
                 _ => ast.push(Node::ClearBytes(decoded_bytes.clone())),
             },
         }

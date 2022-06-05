@@ -60,6 +60,10 @@ pub fn run(tokens: &Tokens) -> Result<Ast> {
     let mut curr_encoding: char = 'Q';
     let mut ast: Ast = vec![];
 
+    const CR: u8 = '\r' as u8;
+    const LF: u8 = '\n' as u8;
+    const SPACE: u8 = ' ' as u8;
+
     for token in tokens {
         use crate::lexer::Token::*;
 
@@ -78,12 +82,9 @@ pub fn run(tokens: &Tokens) -> Result<Ast> {
                 }));
             }
             ClearText(decoded_bytes) => match decoded_bytes[..] {
-                // CRLF + Space
-                [13, 10, 32] => (),
-                // LF + Space
-                [10, 32] => (),
-                // Space
-                [32] => (),
+                [CR, LF, SPACE] => (),
+                [LF, SPACE] => (),
+                [SPACE] => (),
                 _ => ast.push(Node::ClearBytes(decoded_bytes.clone())),
             },
         }

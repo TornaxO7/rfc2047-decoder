@@ -51,13 +51,13 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
     let mut state = ClearText;
     let mut buffer: Vec<u8> = vec![];
 
-    // 61 = Equal symbol '='
-    // 63 = Question mark symbol '?'
+    const EQUAL_SYMBOL: u8 = '=' as u8;
+    const QUESTION_MARK_SYMBOL: u8 = '?' as u8;
 
     loop {
         match state {
             Charset => match curr_byte {
-                Some(63) => {
+                Some(&QUESTION_MARK_SYMBOL) => {
                     state = Encoding;
                     tokens.push(Token::Charset(buffer.clone()));
                     buffer.clear();
@@ -66,7 +66,7 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
                 None => return Err(Error::ParseCharsetError),
             },
             Encoding => match curr_byte {
-                Some(63) => {
+                Some(&QUESTION_MARK_SYMBOL) => {
                     state = EncodedText;
                     tokens.push(Token::Encoding(buffer.clone()));
                     buffer.clear();
@@ -75,17 +75,17 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
                 None => return Err(Error::ParseEncodingError),
             },
             EncodedText => match curr_byte {
-                Some(63) => {
+                Some(&QUESTION_MARK_SYMBOL) => {
                     curr_byte = encoded_bytes_iter.next();
 
                     match curr_byte {
-                        Some(61) => {
+                        Some(&EQUAL_SYMBOL) => {
                             state = ClearText;
                             tokens.push(Token::EncodedText(buffer.clone()));
                             buffer.clear();
                         }
                         _ => {
-                            buffer.push(63);
+                            buffer.push(QUESTION_MARK_SYMBOL);
                             continue;
                         }
                     }
@@ -94,11 +94,11 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
                 None => return Err(Error::ParseEncodedTextError),
             },
             ClearText => match curr_byte {
-                Some(61) => {
+                Some(&EQUAL_SYMBOL) => {
                     curr_byte = encoded_bytes_iter.next();
 
                     match curr_byte {
-                        Some(63) => {
+                        Some(&QUESTION_MARK_SYMBOL) => {
                             state = Charset;
 
                             if !buffer.is_empty() {
@@ -107,7 +107,7 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
                             }
                         }
                         _ => {
-                            buffer.push(61);
+                            buffer.push(EQUAL_SYMBOL);
                             continue;
                         }
                     }

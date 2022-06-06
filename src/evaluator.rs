@@ -64,10 +64,13 @@ fn decode_base64(encoded_bytes: &Vec<u8>) -> Result<Vec<u8>> {
 
 fn decode_quoted_printable(encoded_bytes: &Vec<u8>) -> Result<Vec<u8>> {
     let parse_mode = quoted_printable::ParseMode::Robust;
+
+    const SPACE: u8 = ' ' as u8;
+    const UNDERSCORE: u8 = '_' as u8;
+
     let encoded_bytes = encoded_bytes
         .iter()
-        // Replace underscores by spaces
-        .map(|b| if *b == 95 { 32 } else { *b })
+        .map(|b| if *b == UNDERSCORE { SPACE } else { *b })
         .collect::<Vec<_>>();
     let decoded_bytes = quoted_printable::decode(encoded_bytes, parse_mode)?;
 

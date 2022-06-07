@@ -1,57 +1,18 @@
 #![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.1.2")]
 
-use std::{error, fmt, result};
-
 mod evaluator;
 mod lexer;
 mod parser;
 
-/// Errors can come from the lexer or the parser.
-/// Lexer errors are related to invalid syntaxes.
-/// Parser and Evaluator errors are related to decoding issues.
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
-    RunLexerError(lexer::Error),
-    RunParserError(parser::Error),
-    RunEvaluatorError(evaluator::Error),
+    #[error(transparent)]
+    Lexer(#[from] lexer::Error),
+    #[error(transparent)]
+    Parser(#[from] parser::Error),
+    #[error(transparent)]
+    Decode(#[from] evaluator::Error),
 }
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::RunLexerError(err) => err.fmt(f),
-            Error::RunParserError(err) => err.fmt(f),
-            Error::RunEvaluatorError(err) => err.fmt(f),
-        }
-    }
-}
-
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        None
-    }
-}
-
-impl From<lexer::Error> for Error {
-    fn from(err: lexer::Error) -> Error {
-        Error::RunLexerError(err)
-    }
-}
-
-impl From<parser::Error> for Error {
-    fn from(err: parser::Error) -> Error {
-        Error::RunParserError(err)
-    }
-}
-
-impl From<evaluator::Error> for Error {
-    fn from(err: evaluator::Error) -> Error {
-        Error::RunEvaluatorError(err)
-    }
-}
-
-/// Wrapper around `std::result::Result`.
-pub type Result<T> = result::Result<T, Error>;
 
 /// Decode a RFC 2047 MIME Message Header.
 ///
@@ -68,7 +29,7 @@ pub type Result<T> = result::Result<T, Error>;
 ///
 /// The function can return an error if the lexer,
 /// the parser or the evaluator encounters an error.
-pub fn decode(encoded_str: &[u8]) -> Result<String> {
+pub fn decode(encoded_str: &[u8]) -> Result<String, Error> {
     let tokens = lexer::run(&encoded_str)?;
     let ats = parser::run(&tokens)?;
     let decoded_str = evaluator::run(&ats)?;

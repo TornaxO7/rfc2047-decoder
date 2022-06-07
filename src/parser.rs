@@ -1,5 +1,3 @@
-use std::{error, fmt, result, str};
-
 use crate::lexer::Tokens;
 
 #[derive(Debug, Clone)]
@@ -19,43 +17,20 @@ pub enum Node {
 
 pub type Ast = Vec<Node>;
 
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug, Clone)]
 pub enum Error {
-    DecodeUtf8Error(str::Utf8Error),
+    #[error(transparent)]
+    DecodeUtf8Error(#[from] std::str::Utf8Error),
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::DecodeUtf8Error(err) => err.fmt(f),
-        }
-    }
-}
-
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match *self {
-            Error::DecodeUtf8Error(ref err) => Some(err),
-        }
-    }
-}
-
-impl From<str::Utf8Error> for Error {
-    fn from(err: str::Utf8Error) -> Error {
-        Error::DecodeUtf8Error(err)
-    }
-}
-
-type Result<T> = result::Result<T, Error>;
-
-fn first_char_of(vec: &[u8]) -> Result<char> {
-    match str::from_utf8(vec)?.to_uppercase().chars().next() {
+fn first_char_of(vec: &[u8]) -> Result<char, Error> {
+    match std::str::from_utf8(vec)?.to_uppercase().chars().next() {
         Some(c) => Ok(c),
         None => Ok('Q'),
     }
 }
 
-pub fn run(tokens: &Tokens) -> Result<Ast> {
+pub fn run(tokens: &Tokens) -> Result<Ast, Error> {
     let mut curr_charset: &Vec<u8> = &vec![];
     let mut curr_encoding: char = 'Q';
     let mut ast: Ast = vec![];
@@ -98,14 +73,12 @@ mod tests {
     use crate::parser;
 
     #[test]
-    fn first_char_of() -> parser::Result<()> {
-        assert_eq!('Q', parser::first_char_of(&vec![])?);
-        assert_eq!('Q', parser::first_char_of(&"q".as_bytes())?);
-        assert_eq!('Q', parser::first_char_of(&"Q".as_bytes())?);
-        assert_eq!('B', parser::first_char_of(&"b".as_bytes())?);
-        assert_eq!('B', parser::first_char_of(&"B".as_bytes())?);
-        assert_eq!('B', parser::first_char_of(&"base64".as_bytes())?);
-
-        Ok(())
+    fn first_char_of() {
+        assert_eq!('Q', parser::first_char_of(&vec![]).unwrap());
+        assert_eq!('Q', parser::first_char_of(&"q".as_bytes()).unwrap());
+        assert_eq!('Q', parser::first_char_of(&"Q".as_bytes()).unwrap());
+        assert_eq!('B', parser::first_char_of(&"b".as_bytes()).unwrap());
+        assert_eq!('B', parser::first_char_of(&"B".as_bytes()).unwrap());
+        assert_eq!('B', parser::first_char_of(&"base64".as_bytes()).unwrap());
     }
 }

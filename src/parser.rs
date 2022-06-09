@@ -7,6 +7,7 @@ pub struct EncodedBytes {
     pub bytes: Vec<u8>,
 }
 
+pub type Result<T> = std::result::Result<T, Error>;
 pub type ClearBytes = Vec<u8>;
 
 #[derive(Debug, Clone)]
@@ -23,14 +24,14 @@ pub enum Error {
     DecodeUtf8Error(#[from] std::str::Utf8Error),
 }
 
-fn first_char_of(vec: &[u8]) -> Result<char, Error> {
+fn first_char_of(vec: &[u8]) -> Result<char> {
     match std::str::from_utf8(vec)?.to_uppercase().chars().next() {
         Some(c) => Ok(c),
         None => Ok('Q'),
     }
 }
 
-pub fn run(tokens: &Tokens) -> Result<Ast, Error> {
+pub fn run(tokens: &Tokens) -> Result<Ast> {
     let mut curr_charset: &Vec<u8> = &vec![];
     let mut curr_encoding: char = 'Q';
     let mut ast: Ast = vec![];

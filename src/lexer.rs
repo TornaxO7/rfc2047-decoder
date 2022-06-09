@@ -8,6 +8,7 @@ pub enum Token {
     ClearText(Vec<u8>),
 }
 
+pub type Result<T> = std::result::Result<T, Error>;
 pub type Tokens = Vec<Token>;
 
 enum State {
@@ -27,7 +28,7 @@ pub enum Error {
     ParseEncodedTextError,
 }
 
-pub fn run(encoded_bytes: &[u8]) -> Result<Tokens, Error> {
+pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
     let mut encoded_bytes_iter = encoded_bytes.iter();
     let mut curr_byte = encoded_bytes_iter.next();
     let mut tokens = vec![];

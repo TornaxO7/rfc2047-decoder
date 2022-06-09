@@ -4,6 +4,8 @@ mod evaluator;
 mod lexer;
 mod parser;
 
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error(transparent)]
@@ -29,7 +31,7 @@ pub enum Error {
 ///
 /// The function can return an error if the lexer,
 /// the parser or the evaluator encounters an error.
-pub fn decode(encoded_str: &[u8]) -> Result<String, Error> {
+pub fn decode(encoded_str: &[u8]) -> Result<String> {
     let tokens = lexer::run(&encoded_str)?;
     let ats = parser::run(&tokens)?;
     let decoded_str = evaluator::run(&ats)?;

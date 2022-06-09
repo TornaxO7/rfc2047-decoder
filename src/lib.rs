@@ -11,7 +11,7 @@ pub enum Error {
     #[error(transparent)]
     Parser(#[from] parser::Error),
     #[error(transparent)]
-    Decode(#[from] evaluator::Error),
+    Evaluate(#[from] evaluator::Error),
 }
 
 /// Decode a RFC 2047 MIME Message Header.

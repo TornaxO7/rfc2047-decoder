@@ -1,22 +1,27 @@
-use crate::lexer::State::*;
+use chumsky::{Parser, prelude::Simple};
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Token {
-    Charset(Vec<u8>),
-    Encoding(Vec<u8>),
-    EncodedText(Vec<u8>),
-    ClearText(Vec<u8>),
+const QUESTION_MARK: char = '?';
+const EQUAL_SYMBOL: char = '=';
+const SPACE: char = ' ';
+const ESPECIAL: &'static str = "{}<>@,@:/[]?.=";
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Expr {
+    Token(String),
+    EncodedText(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EncodedWord {
+}
+
+impl EncodedWord {
+    pub const PREFIX: String = format!("{}{}", EQUAL_SYMBOL, QUESTION_MARK);
+    pub const SUFFIX: String = format!("{}{}", QUESTION_MARK, EQUAL_SYMBOL);
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-pub type Tokens = Vec<Token>;
 
-enum State {
-    Charset,
-    Encoding,
-    EncodedText,
-    ClearText,
-}
 
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum Error {
@@ -28,87 +33,36 @@ pub enum Error {
     ParseEncodedTextError,
 }
 
-pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
-    let mut encoded_bytes_iter = encoded_bytes.iter();
-    let mut curr_byte = encoded_bytes_iter.next();
-    let mut tokens = vec![];
-    let mut state = ClearText;
-    let mut buffer: Vec<u8> = vec![];
+pub fn run(encoded_bytes: &[u8]) -> Result<EncodedWord> {
+    Err(Error::ParseCharsetError)
+}
 
-    const EQUAL_SYMBOL: u8 = '=' as u8;
-    const QUESTION_MARK_SYMBOL: u8 = '?' as u8;
+fn parser() -> impl Parser<char, Expr, Error = Simple<char>> {
+    use chumsky::prelude::*;
 
-    loop {
-        match state {
-            Charset => match curr_byte {
-                Some(&QUESTION_MARK_SYMBOL) => {
-                    state = Encoding;
-                    tokens.push(Token::Charset(buffer.clone()));
-                    buffer.clear();
-                }
-                Some(b) => buffer.push(*b),
-                None => return Err(Error::ParseCharsetError),
-            },
-            Encoding => match curr_byte {
-                Some(&QUESTION_MARK_SYMBOL) => {
-                    state = EncodedText;
-                    tokens.push(Token::Encoding(buffer.clone()));
-                    buffer.clear();
-                }
-                Some(b) => buffer.push(*b),
-                None => return Err(Error::ParseEncodingError),
-            },
-            EncodedText => match curr_byte {
-                Some(&QUESTION_MARK_SYMBOL) => {
-                    curr_byte = encoded_bytes_iter.next();
+    let token = filter(|c: &char| *c != SPACE
+                       && !c.is_ascii_control()
+                       && !is_especial(*c))
+        .repeated().at_least(1)
+        .collect::<String>()
+        .map(|token| Expr::Token(token.to_string()));
 
-                    match curr_byte {
-                        Some(&EQUAL_SYMBOL) => {
-                            state = ClearText;
-                            tokens.push(Token::EncodedText(buffer.clone()));
-                            buffer.clear();
-                        }
-                        _ => {
-                            buffer.push(QUESTION_MARK_SYMBOL);
-                            continue;
-                        }
-                    }
-                }
-                Some(b) => buffer.push(*b),
-                None => return Err(Error::ParseEncodedTextError),
-            },
-            ClearText => match curr_byte {
-                Some(&EQUAL_SYMBOL) => {
-                    curr_byte = encoded_bytes_iter.next();
+    let encoded_text = filter(|c: &char| *c != QUESTION_MARK && *c != SPACE)
+        .repeated().at_least(1)
+        .collect::<String>()
+        .map(|encoded_text| Expr::EncodedText(encoded_text.to_string()));
 
-                    match curr_byte {
-                        Some(&QUESTION_MARK_SYMBOL) => {
-                            state = Charset;
+    let encoded_word = just(EncodedWord::PREFIX)
+        .then(token)
+        .then(just(QUESTION_MARK))
+        .then(token)
+        .then(just(QUESTION_MARK))
+        .then(encoded_text)
+        .then(just(EncodedWord::SUFFIX));
 
-                            if !buffer.is_empty() {
-                                tokens.push(Token::ClearText(buffer.clone()));
-                                buffer.clear()
-                            }
-                        }
-                        _ => {
-                            buffer.push(EQUAL_SYMBOL);
-                            continue;
-                        }
-                    }
-                }
-                Some(b) => buffer.push(*b),
-                None => {
-                    if !buffer.is_empty() {
-                        tokens.push(Token::ClearText(buffer.clone()));
-                    }
+    encoded_word
+}
 
-                    break;
-                }
-            },
-        }
-
-        curr_byte = encoded_bytes_iter.next();
-    }
-
-    Ok(tokens)
+fn is_especial(c: char) -> bool {
+    ESPECIAL.contains(c)
 }

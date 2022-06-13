@@ -45,8 +45,6 @@ pub struct EncodedWord {
 impl EncodedWord {
     pub const PREFIX: &'static [u8] = formatcp!("{}{}", EQUAL_SYMBOL, QUESTION_MARK).as_bytes();
     pub const SUFFIX: &'static [u8] = formatcp!("{}{}", QUESTION_MARK, EQUAL_SYMBOL).as_bytes();
-
-    pub const ID: &'static str = "Encoded Word";
 }
 
 pub fn run(encoded_bytes: &[u8]) -> Result<EncodedWord> {

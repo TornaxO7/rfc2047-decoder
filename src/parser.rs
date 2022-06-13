@@ -1,5 +1,6 @@
-use crate::lexer::EncodedWordTokens;
+use crate::lexer::{EncodedWordTokens, Token};
 
+use core::slice::SlicePattern;
 use std::convert::TryFrom;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -65,8 +66,8 @@ fn first_char_of(vec: &[u8]) -> Result<char> {
 }
 
 pub fn run(encoded_word: EncodedWordTokens) -> Result<Ast> {
-    let mut curr_charset: &Vec<u8> = &vec![];
-    let mut curr_encoding: char = 'Q';
+    let mut curr_charset: Token = encoded_word.charset;
+    let mut curr_encoding: char = first_char_of(encoded_word.encoding.as_slice());
     let mut ast: Ast = vec![];
 
     const CR: u8 = '\r' as u8;

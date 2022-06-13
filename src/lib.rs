@@ -2,7 +2,7 @@
 
 // mod evaluator;
 mod lexer;
-// mod parser;
+mod parser;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -32,7 +32,7 @@ pub enum Error {
 /// The function can return an error if the lexer,
 /// the parser or the evaluator encounters an error.
 pub fn decode(encoded_str: &[u8]) -> Result<String> {
-    let encoded_word = lexer::run(&encoded_str)?;
+    let encoded_word: lexer::EncodedWordTokens = lexer::run(&encoded_str)?;
     // let ats = parser::run(&tokens)?;
     // let decoded_str = evaluator::run(&ats)?;
 

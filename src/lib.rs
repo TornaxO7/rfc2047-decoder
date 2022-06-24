@@ -2,7 +2,7 @@
 
 // mod evaluator;
 mod lexer;
-mod parser;
+// mod parser;
 
 pub type Result<T> = std::result::Result<T, Error>;
 

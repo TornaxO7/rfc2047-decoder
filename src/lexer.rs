@@ -1,37 +1,22 @@
-use std::fmt;
-
-use charset::Charset;
 use chumsky::{prelude::Simple, Parser};
 
-use const_format::formatcp;
-
 const QUESTION_MARK: u8 = '?' as u8;
-const EQUAL_SYMBOL: u8 = '=' as u8;
 const SPACE: u8 = ' ' as u8;
-const ESPECIAL: &'static [u8] = "{}<>@,@:/[]?.=".as_bytes();
+const ESPECIAL: &'static [u8] = "{}<>@,@:/[]?=.".as_bytes();
+const AMOUNT_DELIMITERS: usize = "=????=".len();
 
 pub type Token = Vec<u8>;
 pub type EncodedText = Vec<u8>;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
-pub struct Error(Vec<Simple<u8>>);
+#[derive(thiserror::Error, Debug, Clone, PartialEq)]
+pub enum Error {
+    #[error("Couldn't get tokens from: {:?}", .0)]
+    EncodingIssue(Vec<Simple<u8>>),
 
-impl Error {
-    pub fn new(errors: Vec<Simple<u8>>) -> Self {
-        Self(errors)
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for error in &self.0 {
-            write!(f, "{}", error)?;
-        }
-
-        Ok(())
-    }
+    #[error("The encoded word is too long: {:?}", .0)]
+    EncodedWordTooLong(Vec<u8>),
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
@@ -42,18 +27,26 @@ pub struct EncodedWordTokens {
 }
 
 impl EncodedWordTokens {
-    pub const PREFIX: &'static [u8] = formatcp!("{}{}", EQUAL_SYMBOL, QUESTION_MARK).as_bytes();
-    pub const SUFFIX: &'static [u8] = formatcp!("{}{}", QUESTION_MARK, EQUAL_SYMBOL).as_bytes();
-    pub const MAX_CHARSET_LENGTH: usize = 75;
-    pub const MIN_CHARSET_LENGTH: usize = 1;
+    pub const PREFIX: &'static [u8] = "=?".as_bytes();
+    pub const SUFFIX: &'static [u8] = "?=".as_bytes();
+    pub const MAX_ENCODED_WORD_LENGTH: usize = 75;
 
-    pub const MIN_ENCODING_LENGTH: usize = 1;
-
-    pub const MIN_ENCODED_TEXT_LENGTH: usize = 1;
+    /// Returns the length of the encoded word including the delimiters
+    pub fn len(&self) -> usize {
+        self.charset.len() + self.encoding.len() + self.encoded_text.len() + AMOUNT_DELIMITERS
+    }
 }
 
 pub fn run(encoded_bytes: &[u8]) -> Result<EncodedWordTokens> {
-    get_parser().parse(encoded_bytes).map_err(Error::new)
+    let encoded_word = get_parser().parse(encoded_bytes);
+
+    if let Ok(encoded_word) = &encoded_word {
+        if encoded_word.len() > EncodedWordTokens::MAX_ENCODED_WORD_LENGTH {
+            return Err(Error::EncodedWordTooLong(encoded_bytes.to_vec()));
+        }
+    }
+
+    encoded_word.map_err(|err| Error::EncodingIssue(err))
 }
 
 fn get_parser() -> impl Parser<u8, EncodedWordTokens, Error = Simple<u8>> {
@@ -61,19 +54,11 @@ fn get_parser() -> impl Parser<u8, EncodedWordTokens, Error = Simple<u8>> {
 
     let token = filter(|&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
 
-    let charset = token
-        .repeated()
-        .at_least(EncodedWordTokens::MIN_CHARSET_LENGTH)
-        .at_most(EncodedWordTokens::MAX_CHARSET_LENGTH)
-        .collect::<Vec<u8>>();
-    let encoding = token
-        .repeated()
-        .at_least(EncodedWordTokens::MIN_ENCODING_LENGTH)
-        .collect::<Vec<u8>>();
+    let charset = token.repeated().collect::<Vec<u8>>();
+    let encoding = token.repeated().collect::<Vec<u8>>();
 
     let encoded_text = filter(|&c: &u8| c != QUESTION_MARK && c != SPACE)
         .repeated()
-        .at_least(EncodedWordTokens::MIN_ENCODED_TEXT_LENGTH)
         .collect::<Vec<u8>>();
 
     let encoded_word = just(EncodedWordTokens::PREFIX)
@@ -100,6 +85,15 @@ fn is_especial(c: u8) -> bool {
 mod tests {
     use super::get_parser;
     use chumsky::Parser;
+
+    #[test]
+    fn test_valid_encoded_word() {
+        
+        let parser = get_parser();
+        let message = "=?ISO-8859-1?Q?Yeet?=".as_bytes();
+
+        parser.parse(message).unwrap();
+    }
 
     #[test]
     #[should_panic]

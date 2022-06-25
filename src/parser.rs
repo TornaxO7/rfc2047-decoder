@@ -1,6 +1,10 @@
-use crate::lexer::EncodedWordTokens;
+use charset::Charset;
+
+use crate::lexer::{EncodedWordTokens, Token};
 
 use std::convert::TryFrom;
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Encoding {
@@ -11,108 +15,131 @@ pub enum Encoding {
 impl Encoding {
     pub const B_CHAR: char = 'b';
     pub const Q_CHAR: char = 'q';
+    pub const ENCODING_LENGTH: usize = 1;
 }
 
-impl TryFrom<u8> for Encoding {
-    type Error = ();
+impl TryFrom<Token> for Encoding {
+    type Error = Error;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        let value = value as char;
+    fn try_from(token: Token) -> Result<Self> {
+        if token.len() > Self::ENCODING_LENGTH {
+            return Err(Error::EncodedWordTooBig);
+        }
 
-        match value {
+        let encoding = token.first().ok_or(Error::EmptyEncoding)?;
+        let encoding = *encoding as char;
+        let encoding = encoding.to_ascii_lowercase();
+
+        match encoding {
             Encoding::Q_CHAR => Ok(Self::Q),
             Encoding::B_CHAR => Ok(Self::B),
-            _ => Err(()),
+            _ => Err(Error::UnknownEncoding(encoding)),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct EncodedWordParsed {
-    pub charset: crate::lexer::Token,
+    pub charset: Charset,
     pub encoding: Encoding,
     pub encoded_text: crate::lexer::EncodedText,
 }
 
-#[derive(Debug, Clone)]
-pub struct EncodedBytes {
-    pub charset: Vec<u8>,
-    pub encoding: char,
-    pub bytes: Vec<u8>,
+impl TryFrom<EncodedWordTokens> for EncodedWordParsed {
+    type Error = Error;
+
+    fn try_from(encoded_word_tokens: EncodedWordTokens) -> Result<Self> {
+        let charset = Charset::for_label(&encoded_word_tokens.charset)
+            .ok_or_else(|| Error::UnknownCharset(format!("{:?}", encoded_word_tokens.charset)))?;
+        let encoding = Encoding::try_from(encoded_word_tokens.encoding)?;
+
+        Ok(EncodedWordParsed {
+            charset,
+            encoding,
+            encoded_text: encoded_word_tokens.encoded_text,
+        })
+    }
 }
-
-pub type ClearBytes = Vec<u8>;
-
-#[derive(Debug, Clone)]
-pub enum Node {
-    EncodedBytes(EncodedBytes),
-    ClearBytes(ClearBytes),
-}
-
-pub type Ast = Vec<Node>;
 
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum Error {
-    #[error(transparent)]
-    DecodeUtf8Error(#[from] std::str::Utf8Error),
+    #[error("Unknown charset: {}", .0)]
+    UnknownCharset(String),
+
+    #[error("Unknown encoding: {}. Encoding can be only either 'Q' or 'B'.", .0)]
+    UnknownEncoding(char),
+
+    #[error("The encoded word is too big")]
+    EncodedWordTooBig,
+
+    #[error("Encoding is empty")]
+    EmptyEncoding,
 }
 
-fn first_char_of(vec: &[u8]) -> Result<char> {
-    match std::str::from_utf8(vec)?.to_uppercase().chars().next() {
-        Some(c) => Ok(c),
-        None => Ok('Q'),
-    }
-}
-
-pub fn run(encoded_word: EncodedWordTokens) -> Result<Ast> {
-    let mut curr_charset: &Vec<u8> = &vec![];
-    let mut curr_encoding: char = 'Q';
-    let mut ast: Ast = vec![];
-
-    const CR: u8 = '\r' as u8;
-    const LF: u8 = '\n' as u8;
-    const SPACE: u8 = ' ' as u8;
-
-    for token in tokens {
-        use crate::lexer::Token::*;
-
-        match token {
-            Charset(charset) => {
-                curr_charset = &charset;
-            }
-            Encoding(encoding) => {
-                curr_encoding = first_char_of(&encoding)?;
-            }
-            EncodedText(encoded_bytes) => {
-                ast.push(Node::EncodedBytes(EncodedBytes {
-                    charset: curr_charset.clone(),
-                    encoding: curr_encoding,
-                    bytes: encoded_bytes.clone(),
-                }));
-            }
-            ClearText(decoded_bytes) => match decoded_bytes[..] {
-                [CR, LF, SPACE] => (),
-                [LF, SPACE] => (),
-                [SPACE] => (),
-                _ => ast.push(Node::ClearBytes(decoded_bytes.clone())),
-            },
-        }
-    }
-
-    Ok(ast)
+pub fn run(encoded_word: EncodedWordTokens) -> Result<EncodedWordParsed> {
+    EncodedWordParsed::try_from(encoded_word)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parser;
 
+    use crate::parser;
+    use crate::lexer;
+    use crate::parser::Encoding;
+
+    /// Example taken from:
+    /// https://datatracker.ietf.org/doc/html/rfc2047#section-8
+    ///
+    /// `From` field
     #[test]
-    fn first_char_of() {
-        assert_eq!('Q', parser::first_char_of(&vec![]).unwrap());
-        assert_eq!('Q', parser::first_char_of(&"q".as_bytes()).unwrap());
-        assert_eq!('Q', parser::first_char_of(&"Q".as_bytes()).unwrap());
-        assert_eq!('B', parser::first_char_of(&"b".as_bytes()).unwrap());
-        assert_eq!('B', parser::first_char_of(&"B".as_bytes()).unwrap());
-        assert_eq!('B', parser::first_char_of(&"base64".as_bytes()).unwrap());
+    fn test_parse1() {
+        let message = "=?US-ASCII?Q?Keith_Moore?=".as_bytes();
+        let tokens = lexer::run(&message).unwrap();
+        let parsed = parser::run(tokens).unwrap();
+
+        assert_eq!(parsed.encoding, Encoding::Q);
+        assert_eq!(parsed.encoded_text, "Keith_Moore".as_bytes(), "{:#?}", parsed.encoded_text);
+    }
+
+    /// Example taken from:
+    /// https://datatracker.ietf.org/doc/html/rfc2047#section-8
+    ///
+    /// `To` field
+    #[test]
+    fn test_parse2() {
+        let message = "=?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?=".as_bytes();
+        let tokens = lexer::run(&message).unwrap();
+        let parsed = parser::run(tokens).unwrap();
+
+        assert_eq!(parsed.encoding, Encoding::Q);
+        assert_eq!(parsed.encoded_text, "Keld_J=F8rn_Simonsen".as_bytes());
+    }
+
+    /// Example taken from:
+    /// https://datatracker.ietf.org/doc/html/rfc2047#section-8
+    ///
+    /// `CC` field
+    #[test]
+    fn test_parse3() {
+        let message = "=?ISO-8859-1?Q?Andr=E9?=".as_bytes();
+        let tokens = lexer::run(&message).unwrap();
+        let parsed = parser::run(tokens).unwrap();
+
+        assert_eq!(parsed.encoding, Encoding::Q);
+        assert_eq!(parsed.encoded_text, "Andr=E9".as_bytes());
+    }
+
+    /// Example taken from:
+    /// https://datatracker.ietf.org/doc/html/rfc2047#section-8
+    ///
+    /// `Subject` field
+    #[test]
+    fn test_parse4() {
+        let message = "=?ISO-8859-1?B?SWYgeW91IGNhbiByZWFkIHRoaXMgeW8=?=".as_bytes();
+        let tokens = lexer::run(&message).unwrap();
+        let parsed = parser::run(tokens).unwrap();
+
+        assert_eq!(parsed.encoding, Encoding::B);
+        assert_eq!(parsed.encoded_text, "SWYgeW91IGNhbiByZWFkIHRoaXMgeW8=".as_bytes());
     }
 }

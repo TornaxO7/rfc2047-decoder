@@ -6,6 +6,7 @@ const ESPECIAL: &'static [u8] = "{}<>@,@:/[]?=.".as_bytes();
 const AMOUNT_DELIMITERS: usize = "=????=".len();
 
 pub type Result<T> = std::result::Result<T, Error>;
+pub type Tokens = Vec<Token>;
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]
 pub enum Error {
@@ -42,9 +43,26 @@ impl Token {
             } => charset.len() + encoding.len() + encoded_text.len() + AMOUNT_DELIMITERS,
         }
     }
+
+    pub fn get_bytes(&self) -> Vec<u8> {
+        match self {
+            Token::ClearText(token) => token.clone(),
+            Token::EncodedWord {
+                charset,
+                encoding,
+                encoded_text,
+            } => {
+                let bytes = Vec::new();
+                bytes.extend(charset);
+                bytes.extend(encoding);
+                bytes.extend(encoded_text);
+                bytes
+            },
+        }
+    }
 }
 
-pub fn run(encoded_bytes: &[u8]) -> Result<Token> {
+pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
     let encoded_word = get_parser().parse(encoded_bytes);
 
     if let Ok(encoded_word) = &encoded_word {
@@ -56,17 +74,28 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Token> {
     encoded_word.map_err(|err| Error::EncodingIssue(err))
 }
 
-fn get_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
+fn is_especial(c: u8) -> bool {
+    ESPECIAL.contains(&c)
+}
+
+fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
     let clear_text_parser = get_clear_text_parser();
-    let encoded_word_parser = get_encoded_wor_parser();
+    let encoded_word_parser = get_encoded_word_parser();
 
-    encoded_word_parser.or(clear_text_parser)
-}
-
-fn is_especial(c: u8) -> bool {
-    ESPECIAL.contains(&c)
+    encoded_word_parser
+        .or(clear_text_parser)
+        .map(|token: Token|
+             if let Token::EncodedWord { charset: _, encoding: _, encoded_text: _} = token {
+                 if token.len() > Token::MAX_ENCODED_WORD_LENGTH {
+                     return Err(Error::EncodedWordTooLong(token.get_bytes());
+                 }
+             }
+             token
+        )
+        .repeated()
+        .collect::<Tokens>()
 }
 
 fn get_clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
@@ -80,7 +109,7 @@ fn get_clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     .map(|clear_text| Token::ClearText(clear_text))
 }
 
-fn get_encoded_wor_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
+fn get_encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
     let token = filter(|&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
@@ -98,9 +127,9 @@ fn get_encoded_wor_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
         .then(encoded_text)
         .then_ignore(just(Token::ENCODED_WORD_SUFFIX))
         .map(|((charset, encoding), encoded_text)| Token::EncodedWord {
-            charset,
-            encoding,
-            encoded_text,
+                charset,
+                encoding,
+                encoded_text,
         })
 }
 
@@ -118,11 +147,14 @@ mod tests {
 
         let parsed = parser.parse(message).unwrap();
 
-        assert_eq!(parsed, Token::EncodedWord {
-            charset: "ISO-8859-1".as_bytes().to_vec(),
-            encoding: "Q".as_bytes().to_vec(),
-            encoded_text: "Yeet".as_bytes().to_vec(),
-        });
+        assert_eq!(
+            parsed,
+            Token::EncodedWord {
+                charset: "ISO-8859-1".as_bytes().to_vec(),
+                encoding: "Q".as_bytes().to_vec(),
+                encoded_text: "Yeet".as_bytes().to_vec(),
+            }
+        );
     }
 
     #[test]
@@ -132,6 +164,9 @@ mod tests {
 
         let parsed = parser.parse(message).unwrap();
 
-        assert_eq!(parsed, Token::ClearText("I use Arch by the way".as_bytes().to_vec()));
+        assert_eq!(
+            parsed,
+            Token::ClearText("I use Arch by the way".as_bytes().to_vec())
+        );
     }
 }

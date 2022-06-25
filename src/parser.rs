@@ -1,6 +1,6 @@
 use charset::Charset;
 
-use crate::lexer::{EncodedWordTokens, Token};
+use crate::lexer::{TextToken, Token};
 
 use std::convert::TryFrom;
 
@@ -45,10 +45,10 @@ pub struct EncodedWordParsed {
     pub encoded_text: crate::lexer::EncodedText,
 }
 
-impl TryFrom<EncodedWordTokens> for EncodedWordParsed {
+impl TryFrom<TextToken> for EncodedWordParsed {
     type Error = Error;
 
-    fn try_from(encoded_word_tokens: EncodedWordTokens) -> Result<Self> {
+    fn try_from(encoded_word_tokens: TextToken) -> Result<Self> {
         let charset = Charset::for_label(&encoded_word_tokens.charset)
             .ok_or_else(|| Error::UnknownCharset(format!("{:?}", encoded_word_tokens.charset)))?;
         let encoding = Encoding::try_from(encoded_word_tokens.encoding)?;
@@ -76,7 +76,7 @@ pub enum Error {
     EmptyEncoding,
 }
 
-pub fn run(encoded_word: EncodedWordTokens) -> Result<EncodedWordParsed> {
+pub fn run(encoded_word: TextToken) -> Result<EncodedWordParsed> {
     EncodedWordParsed::try_from(encoded_word)
 }
 

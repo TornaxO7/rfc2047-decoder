@@ -1,6 +1,6 @@
 use charset::{self, Charset};
 
-// use crate::parser::{Ast, Node::*};
+use crate::parser::{EncodedWordParsed, Encoding};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -40,20 +40,14 @@ fn decode_quoted_printable(encoded_bytes: &Vec<u8>) -> Result<Vec<u8>> {
     Ok(decoded_bytes)
 }
 
-pub fn decode_with_encoding(
-    encoding: char,
-    encoded_bytes: &Vec<u8>,
-) -> Result<Vec<u8>> {
+pub fn decode_with_encoding(encoding: char, encoded_bytes: &Vec<u8>) -> Result<Vec<u8>> {
     match encoding.to_uppercase().next() {
         Some('B') => decode_base64(encoded_bytes),
         Some('Q') | _ => decode_quoted_printable(encoded_bytes),
     }
 }
 
-pub fn decode_with_charset(
-    charset: &Vec<u8>,
-    decoded_bytes: &Vec<u8>,
-) -> Result<String> {
+pub fn decode_with_charset(charset: &Vec<u8>, decoded_bytes: &Vec<u8>) -> Result<String> {
     let decoded_str = match Charset::for_label(charset) {
         Some(charset) => charset.decode(decoded_bytes).0,
         None => charset::decode_ascii(decoded_bytes),
@@ -62,7 +56,8 @@ pub fn decode_with_charset(
     Ok(decoded_str.into_owned())
 }
 
-pub fn run(ast: &Ast) -> Result<String> {
+pub fn run(encoded_word_parsed: EncodedWordParsed) -> Result<String> {
+
     let mut output = String::new();
 
     for node in ast {

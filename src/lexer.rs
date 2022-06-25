@@ -5,9 +5,6 @@ const SPACE: u8 = ' ' as u8;
 const ESPECIAL: &'static [u8] = "{}<>@,@:/[]?=.".as_bytes();
 const AMOUNT_DELIMITERS: usize = "=????=".len();
 
-pub type Token = Vec<u8>;
-pub type EncodedText = Vec<u8>;
-
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]
@@ -19,29 +16,39 @@ pub enum Error {
     EncodedWordTooLong(Vec<u8>),
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
-pub struct EncodedWordTokens {
-    pub charset: Token,
-    pub encoding: Token,
-    pub encoded_text: EncodedText,
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+pub enum Token {
+    ClearText(Vec<u8>),
+    EncodedWord {
+        charset: Vec<u8>,
+        encoding: Vec<u8>,
+        encoded_text: Vec<u8>,
+    },
 }
 
-impl EncodedWordTokens {
-    pub const PREFIX: &'static [u8] = "=?".as_bytes();
-    pub const SUFFIX: &'static [u8] = "?=".as_bytes();
+impl Token {
+    pub const ENCODED_WORD_PREFIX: &'static [u8] = "=?".as_bytes();
+    pub const ENCODED_WORD_SUFFIX: &'static [u8] = "?=".as_bytes();
     pub const MAX_ENCODED_WORD_LENGTH: usize = 75;
 
     /// Returns the length of the encoded word including the delimiters
     pub fn len(&self) -> usize {
-        self.charset.len() + self.encoding.len() + self.encoded_text.len() + AMOUNT_DELIMITERS
+        match self {
+            Token::ClearText(token) => token.len(),
+            Token::EncodedWord {
+                charset,
+                encoding,
+                encoded_text,
+            } => charset.len() + encoding.len() + encoded_text.len() + AMOUNT_DELIMITERS,
+        }
     }
 }
 
-pub fn run(encoded_bytes: &[u8]) -> Result<EncodedWordTokens> {
+pub fn run(encoded_bytes: &[u8]) -> Result<Token> {
     let encoded_word = get_parser().parse(encoded_bytes);
 
     if let Ok(encoded_word) = &encoded_word {
-        if encoded_word.len() > EncodedWordTokens::MAX_ENCODED_WORD_LENGTH {
+        if encoded_word.len() > Token::MAX_ENCODED_WORD_LENGTH {
             return Err(Error::EncodedWordTooLong(encoded_bytes.to_vec()));
         }
     }
@@ -49,124 +56,82 @@ pub fn run(encoded_bytes: &[u8]) -> Result<EncodedWordTokens> {
     encoded_word.map_err(|err| Error::EncodingIssue(err))
 }
 
-fn get_parser() -> impl Parser<u8, EncodedWordTokens, Error = Simple<u8>> {
+fn get_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
-    let token = filter(|&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
+    let clear_text_parser = get_clear_text_parser();
+    let encoded_word_parser = get_encoded_wor_parser();
 
-    let charset = token.repeated().collect::<Vec<u8>>();
-    let encoding = token.repeated().collect::<Vec<u8>>();
-
-    let encoded_text = filter(|&c: &u8| c != QUESTION_MARK && c != SPACE)
-        .repeated()
-        .collect::<Vec<u8>>();
-
-    let encoded_word = just(EncodedWordTokens::PREFIX)
-        .ignore_then(charset)
-        .then_ignore(just(QUESTION_MARK))
-        .then(encoding)
-        .then_ignore(just(QUESTION_MARK))
-        .then(encoded_text)
-        .then_ignore(just(EncodedWordTokens::SUFFIX))
-        .map(|((charset, encoding), encoded_text)| EncodedWordTokens {
-            charset,
-            encoding,
-            encoded_text,
-        });
-
-    encoded_word
+    encoded_word_parser.or(clear_text_parser)
 }
 
 fn is_especial(c: u8) -> bool {
     ESPECIAL.contains(&c)
 }
 
+fn get_clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
+    use chumsky::prelude::*;
+
+    filter(|&c: &u8| {
+        c.is_ascii_whitespace() || c.is_ascii_alphanumeric() || c.is_ascii_punctuation()
+    })
+    .repeated()
+    .collect::<Vec<u8>>()
+    .map(|clear_text| Token::ClearText(clear_text))
+}
+
+fn get_encoded_wor_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
+    use chumsky::prelude::*;
+
+    let token = filter(|&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
+    let charset = token.repeated().collect::<Vec<u8>>();
+    let encoding = token.repeated().collect::<Vec<u8>>();
+    let encoded_text = filter(|&c: &u8| c != QUESTION_MARK && c != SPACE)
+        .repeated()
+        .collect::<Vec<u8>>();
+
+    just(Token::ENCODED_WORD_PREFIX)
+        .ignore_then(charset)
+        .then_ignore(just(QUESTION_MARK))
+        .then(encoding)
+        .then_ignore(just(QUESTION_MARK))
+        .then(encoded_text)
+        .then_ignore(just(Token::ENCODED_WORD_SUFFIX))
+        .map(|((charset, encoding), encoded_text)| Token::EncodedWord {
+            charset,
+            encoding,
+            encoded_text,
+        })
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::lexer::Token;
+
     use super::get_parser;
     use chumsky::Parser;
 
     #[test]
-    fn test_valid_encoded_word() {
-        
+    fn test_encoded_word() {
         let parser = get_parser();
         let message = "=?ISO-8859-1?Q?Yeet?=".as_bytes();
 
-        parser.parse(message).unwrap();
+        let parsed = parser.parse(message).unwrap();
+
+        assert_eq!(parsed, Token::EncodedWord {
+            charset: "ISO-8859-1".as_bytes().to_vec(),
+            encoding: "Q".as_bytes().to_vec(),
+            encoded_text: "Yeet".as_bytes().to_vec(),
+        });
     }
 
     #[test]
-    #[should_panic]
-    fn invalid_prefix() {
+    fn test_clear_text() {
         let parser = get_parser();
-        let message = "?ISO-8859-1?Q?Yeet?=".as_bytes();
+        let message = "I use Arch by the way".as_bytes();
 
-        parser.parse(message).unwrap();
-    }
+        let parsed = parser.parse(message).unwrap();
 
-    /// missing a question mark
-    #[test]
-    #[should_panic]
-    fn missing_question_mark() {
-        let parser = get_parser();
-        let message = "=?ISO-8859-1Q?Yeet?=".as_bytes();
-
-        parser.parse(message).unwrap();
-    }
-
-    /// missing both question marks in the middle
-    #[test]
-    #[should_panic]
-    fn missing_question_marks() {
-        let parser = get_parser();
-        let message = "=?ISO-8859-1QYeet?=".as_bytes();
-
-        parser.parse(message).unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn invalid_suffix() {
-        let parser = get_parser();
-        let message = "=?ISO-8859-1?Q?Yeet?".as_bytes();
-
-        parser.parse(message).unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn invalid_token_is_space() {
-        let parser = get_parser();
-        let message = "=?is space?Q?Yeet?=".as_bytes();
-
-        parser.parse(message).unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn invalid_token_is_ctl() {
-        let parser = get_parser();
-        let message = format!("=?{}?Q?Yeet?", 0 as char);
-        let message = message.as_bytes();
-
-        parser.parse(message).unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn invalid_token_is_especial() {
-        let parser = get_parser();
-        let message = "=?)?Q?Yeet?".as_bytes();
-
-        parser.parse(message).unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn invalid_encoded_text() {
-        let parser = get_parser();
-        let message = "=?ISO-8859-1?Q? ?=".as_bytes();
-
-        parser.parse(message).unwrap();
+        assert_eq!(parsed, Token::ClearText("I use Arch by the way".as_bytes().to_vec()));
     }
 }

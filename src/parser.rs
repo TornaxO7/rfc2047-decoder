@@ -1,6 +1,6 @@
 use charset::Charset;
 
-use crate::lexer::{TextToken, Token};
+use crate::lexer::Token;
 
 use std::convert::TryFrom;
 
@@ -18,10 +18,10 @@ impl Encoding {
     pub const ENCODING_LENGTH: usize = 1;
 }
 
-impl TryFrom<Token> for Encoding {
+impl TryFrom<Vec<u8>> for Encoding {
     type Error = Error;
 
-    fn try_from(token: Token) -> Result<Self> {
+    fn try_from(token: Vec<u8>) -> Result<Self> {
         if token.len() > Self::ENCODING_LENGTH {
             return Err(Error::EncodedWordTooBig);
         }
@@ -38,26 +38,40 @@ impl TryFrom<Token> for Encoding {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct EncodedWordParsed {
-    pub charset: Charset,
-    pub encoding: Encoding,
-    pub encoded_text: crate::lexer::EncodedText,
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub enum EncodedWordParsed {
+    ClearText(Vec<u8>),
+    EncodedWord {
+        charset: Charset,
+        encoding: Encoding,
+        encoded_text: Vec<u8>,
+    },
 }
 
-impl TryFrom<TextToken> for EncodedWordParsed {
+impl TryFrom<Token> for EncodedWordParsed {
     type Error = Error;
 
-    fn try_from(encoded_word_tokens: TextToken) -> Result<Self> {
-        let charset = Charset::for_label(&encoded_word_tokens.charset)
-            .ok_or_else(|| Error::UnknownCharset(format!("{:?}", encoded_word_tokens.charset)))?;
-        let encoding = Encoding::try_from(encoded_word_tokens.encoding)?;
+    fn try_from(encoded_word_tokens: Token) -> Result<Self> {
+        match encoded_word_tokens {
+            Token::ClearText(clear_text) => Ok(Self::ClearText(clear_text)),
+            Token::EncodedWord {
+                charset,
+                encoding,
+                encoded_text,
+            } => {
+                let charset =
+                    Charset::for_label(&charset).ok_or_else(|| {
+                        Error::UnknownCharset(format!("{:?}", charset))
+                    })?;
+                let encoding = Encoding::try_from(encoding)?;
 
-        Ok(EncodedWordParsed {
-            charset,
-            encoding,
-            encoded_text: encoded_word_tokens.encoded_text,
-        })
+                Ok(Self::EncodedWord {
+                    charset,
+                    encoding,
+                    encoded_text,
+                })
+            }
+        }
     }
 }
 
@@ -76,17 +90,19 @@ pub enum Error {
     EmptyEncoding,
 }
 
-pub fn run(encoded_word: TextToken) -> Result<EncodedWordParsed> {
+pub fn run(encoded_word: Token) -> Result<EncodedWordParsed> {
     EncodedWordParsed::try_from(encoded_word)
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::parser;
-    use crate::lexer;
-    use crate::parser::Encoding;
+    use charset::Charset;
 
+    use crate::lexer;
+    use crate::parser;
+    use crate::parser::{EncodedWordParsed, Encoding};
+    
     /// Example taken from:
     /// https://datatracker.ietf.org/doc/html/rfc2047#section-8
     ///
@@ -97,8 +113,13 @@ mod tests {
         let tokens = lexer::run(&message).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
-        assert_eq!(parsed.encoding, Encoding::Q);
-        assert_eq!(parsed.encoded_text, "Keith_Moore".as_bytes(), "{:#?}", parsed.encoded_text);
+        let expected = EncodedWordParsed::EncodedWord {
+            charset: Charset::for_label("US-ASCII".as_bytes()).unwrap(),
+            encoding: Encoding::Q,
+            encoded_text: "Keith_Moore".as_bytes().to_vec(),
+        };
+
+        assert_eq!(parsed, expected);
     }
 
     /// Example taken from:
@@ -111,8 +132,13 @@ mod tests {
         let tokens = lexer::run(&message).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
-        assert_eq!(parsed.encoding, Encoding::Q);
-        assert_eq!(parsed.encoded_text, "Keld_J=F8rn_Simonsen".as_bytes());
+        let expected = EncodedWordParsed::EncodedWord {
+            charset: Charset::for_label("ISO-8859-1".as_bytes()).unwrap(),
+            encoding: Encoding::Q,
+            encoded_text: "Keld_J=F8rn_Simonsen".as_bytes().to_vec()
+        };
+
+        assert_eq!(parsed, expected);
     }
 
     /// Example taken from:
@@ -125,8 +151,13 @@ mod tests {
         let tokens = lexer::run(&message).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
-        assert_eq!(parsed.encoding, Encoding::Q);
-        assert_eq!(parsed.encoded_text, "Andr=E9".as_bytes());
+        let expected = EncodedWordParsed::EncodedWord {
+            charset: Charset::for_label("ISO-8859-1".as_bytes()).unwrap(),
+            encoding: Encoding::Q,
+            encoded_text: "Andr=E9".as_bytes().to_vec()
+        };
+
+        assert_eq!(parsed, expected);
     }
 
     /// Example taken from:
@@ -139,7 +170,12 @@ mod tests {
         let tokens = lexer::run(&message).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
-        assert_eq!(parsed.encoding, Encoding::B);
-        assert_eq!(parsed.encoded_text, "SWYgeW91IGNhbiByZWFkIHRoaXMgeW8=".as_bytes());
+        let expected = EncodedWordParsed::EncodedWord {
+            charset: Charset::for_label("ISO-8859-1".as_bytes()).unwrap(),
+            encoding: Encoding::B,
+            encoded_text: "SWYgeW91IGNhbiByZWFkIHRoaXMgeW8=".as_bytes().to_vec()
+        };
+
+        assert_eq!(parsed, expected);
     }
 }

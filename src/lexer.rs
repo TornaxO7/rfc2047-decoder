@@ -84,7 +84,8 @@ fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     let clear_text_parser = get_clear_text_parser();
     let encoded_word_parser = get_encoded_word_parser();
 
-    encoded_word_parser.or(clear_text_parser)
+    clear_text_parser
+        .or(encoded_word_parser)
         .repeated()
         .collect::<Tokens>()
 }
@@ -96,6 +97,7 @@ fn get_clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
         c.is_ascii_whitespace() || c.is_ascii_alphanumeric() || c.is_ascii_punctuation()
     })
     .repeated()
+    .at_least(1)
     .collect::<Vec<u8>>()
     .map(|clear_text| Token::ClearText(clear_text))
 }
@@ -117,8 +119,8 @@ fn get_encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     let is_especial = |c: u8| ESPECIAL.contains(&c);
 
     let token = filter(move |&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
-    let charset = token.repeated().collect::<Vec<u8>>();
-    let encoding = token.repeated().collect::<Vec<u8>>();
+    let charset = token.repeated().at_least(1).collect::<Vec<u8>>();
+    let encoding = token.repeated().at_least(1).collect::<Vec<u8>>();
     let encoded_text = filter(|&c: &u8| c != QUESTION_MARK && c != SPACE)
         .repeated()
         .collect::<Vec<u8>>();
@@ -170,6 +172,72 @@ mod tests {
             vec![Token::ClearText(
                 "I use Arch by the way".as_bytes().to_vec()
             )]
+        );
+    }
+
+    // The following examples are from the encoded-form table in section 8:
+    // https://datatracker.ietf.org/doc/html/rfc2047#section-8
+    #[test]
+    fn test_encoded_from_1() {
+        let parser = get_parser();
+        let message = "=?ISO-8859-1?Q?a?=".as_bytes();
+
+        let parsed = parser.parse(message).unwrap();
+
+        assert_eq!(
+            parsed,
+            vec![Token::EncodedWord {
+                charset: "ISO-8859-1".as_bytes().to_vec(),
+                encoding: "Q".as_bytes().to_vec(),
+                encoded_text: "a".as_bytes().to_vec()
+            }]
+        );
+    }
+
+    // see test_encoded_from_1
+    #[test]
+    fn test_encoded_from_2() {
+        let parser = get_parser();
+        let message = "=?ISO-8859-1?Q?a?= b".as_bytes();
+
+        let parsed = parser.parse(message).unwrap();
+
+        assert_eq!(
+            parsed,
+            vec![
+                Token::EncodedWord {
+                    charset: "ISO-8859-1".as_bytes().to_vec(),
+                    encoding: "Q".as_bytes().to_vec(),
+                    encoded_text: "a".as_bytes().to_vec(),
+                },
+                Token::ClearText(" b".as_bytes().to_vec())
+            ]
+        );
+    }
+
+    // see test_encoded_from_1
+    #[test]
+    fn test_encoded_from_3() {
+        let parser = get_parser();
+        let message = "=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=".as_bytes();
+
+        let parsed = parser.parse(message).unwrap();
+
+        assert_eq!(
+            parsed,
+            vec![
+                Token::EncodedWord {
+                    charset: "ISO-8859-1".as_bytes().to_vec(),
+                    encoding: "Q".as_bytes().to_vec(),
+                    encoded_text: "a".as_bytes().to_vec(),
+                },
+                Token::ClearText(" ".as_bytes().to_vec()),
+                Token::EncodedWord {
+                    charset: "ISO-8859-1".as_bytes().to_vec(),
+                    encoding: "Q".as_bytes().to_vec(),
+                    encoded_text: "b".as_bytes().to_vec()
+                }
+            ]
         );
     }
 }

@@ -52,7 +52,7 @@ impl Token {
                 encoding,
                 encoded_text,
             } => {
-                let bytes = Vec::new();
+                let mut bytes = Vec::new();
                 bytes.extend(charset);
                 bytes.extend(encoding);
                 bytes.extend(encoded_text);
@@ -60,16 +60,18 @@ impl Token {
             }
         }
     }
+
+    pub fn get_encoded_word(((charset, encoding), encoded_text): ((Vec<u8>, Vec<u8>), Vec<u8>)) -> Self {
+        Self::EncodedWord {
+            charset,
+            encoding,
+            encoded_text
+        }
+    }
 }
 
 pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
     let encoded_word = get_parser().parse(encoded_bytes);
-
-    if let Ok(encoded_word) = &encoded_word {
-        if encoded_word.len() > Token::MAX_ENCODED_WORD_LENGTH {
-            return Err(Error::EncodedWordTooLong(encoded_bytes.to_vec()));
-        }
-    }
 
     encoded_word.map_err(|err| Error::EncodingIssue(err))
 }
@@ -104,6 +106,14 @@ fn get_clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
 fn get_encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
+    let check_encoded_word_length = |token: Token, span| {
+            if token.len() > Token::MAX_ENCODED_WORD_LENGTH {
+                Err(Simple::custom(span, Error::EncodedWordTooLong(token.get_bytes())))
+            } else {
+                Ok(token)
+            }
+    };
+
     let token = filter(|&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
     let charset = token.repeated().collect::<Vec<u8>>();
     let encoding = token.repeated().collect::<Vec<u8>>();
@@ -112,27 +122,14 @@ fn get_encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
         .collect::<Vec<u8>>();
 
     just(Token::ENCODED_WORD_PREFIX)
-        .try_map(|parser, span| {
-            parser
-                .ignore_then(charset)
-                .then_ignore(just(QUESTION_MARK))
-                .then(encoding)
-                .then_ignore(just(QUESTION_MARK))
-                .then(encoded_text)
-                .then_ignore(just(Token::ENCODED_WORD_SUFFIX));
-
-            let token = Token::EncodedWord {
-                charset,
-                encoding,
-                encoded_text,
-            };
-
-            if token.len() > Token::MAX_ENCODED_WORD_LENGTH {
-                Simple::custom(0.00, Error::EncodedWordTooLong(token.get_bytes()))
-            } else {
-                token
-            }
-        })
+        .ignore_then(charset)
+        .then_ignore(just(QUESTION_MARK))
+        .then(encoding)
+        .then_ignore(just(QUESTION_MARK))
+        .then(encoded_text)
+        .then_ignore(just(Token::ENCODED_WORD_SUFFIX))
+        .map(Token::get_encoded_word)
+        .try_map(check_encoded_word_length)
 }
 
 #[cfg(test)]
@@ -151,11 +148,11 @@ mod tests {
 
         assert_eq!(
             parsed,
-            Token::EncodedWord {
+            vec![Token::EncodedWord {
                 charset: "ISO-8859-1".as_bytes().to_vec(),
                 encoding: "Q".as_bytes().to_vec(),
                 encoded_text: "Yeet".as_bytes().to_vec(),
-            }
+            }]
         );
     }
 
@@ -168,7 +165,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            Token::ClearText("I use Arch by the way".as_bytes().to_vec())
+            vec![Token::ClearText("I use Arch by the way".as_bytes().to_vec())]
         );
     }
 }

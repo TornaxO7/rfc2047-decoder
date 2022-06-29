@@ -32,7 +32,7 @@ pub enum Error {
 /// The function can return an error if the lexer,
 /// the parser or the evaluator encounters an error.
 pub fn decode(encoded_str: &[u8]) -> Result<String> {
-    let encoded_word_tokens: lexer::Token = lexer::run(&encoded_str)?;
+    let encoded_word_tokens: lexer::Tokens = lexer::run(&encoded_str)?;
     // let encoded_word_parsed = parser::run(encoded_word_tokens)?;
     // let decoded_str = evaluator::run(&ats)?;
 

@@ -57,7 +57,7 @@ impl Token {
                 bytes.extend(encoding);
                 bytes.extend(encoded_text);
                 bytes
-            },
+            }
         }
     }
 }
@@ -86,14 +86,6 @@ fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
 
     encoded_word_parser
         .or(clear_text_parser)
-        .map(|token: Token|
-             if let Token::EncodedWord { charset: _, encoding: _, encoded_text: _} = token {
-                 if token.len() > Token::MAX_ENCODED_WORD_LENGTH {
-                     return Err(Error::EncodedWordTooLong(token.get_bytes());
-                 }
-             }
-             token
-        )
         .repeated()
         .collect::<Tokens>()
 }
@@ -120,16 +112,26 @@ fn get_encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
         .collect::<Vec<u8>>();
 
     just(Token::ENCODED_WORD_PREFIX)
-        .ignore_then(charset)
-        .then_ignore(just(QUESTION_MARK))
-        .then(encoding)
-        .then_ignore(just(QUESTION_MARK))
-        .then(encoded_text)
-        .then_ignore(just(Token::ENCODED_WORD_SUFFIX))
-        .map(|((charset, encoding), encoded_text)| Token::EncodedWord {
+        .try_map(|parser, span| {
+            parser
+                .ignore_then(charset)
+                .then_ignore(just(QUESTION_MARK))
+                .then(encoding)
+                .then_ignore(just(QUESTION_MARK))
+                .then(encoded_text)
+                .then_ignore(just(Token::ENCODED_WORD_SUFFIX));
+
+            let token = Token::EncodedWord {
                 charset,
                 encoding,
                 encoded_text,
+            };
+
+            if token.len() > Token::MAX_ENCODED_WORD_LENGTH {
+                Simple::custom(0.00, Error::EncodedWordTooLong(token.get_bytes()))
+            } else {
+                token
+            }
         })
 }
 

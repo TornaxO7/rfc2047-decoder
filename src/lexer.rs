@@ -61,11 +61,13 @@ impl Token {
         }
     }
 
-    pub fn get_encoded_word(((charset, encoding), encoded_text): ((Vec<u8>, Vec<u8>), Vec<u8>)) -> Self {
+    pub fn get_encoded_word(
+        ((charset, encoding), encoded_text): ((Vec<u8>, Vec<u8>), Vec<u8>),
+    ) -> Self {
         Self::EncodedWord {
             charset,
             encoding,
-            encoded_text
+            encoded_text,
         }
     }
 }
@@ -76,18 +78,13 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
     encoded_word.map_err(|err| Error::EncodingIssue(err))
 }
 
-fn is_especial(c: u8) -> bool {
-    ESPECIAL.contains(&c)
-}
-
 fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
     let clear_text_parser = get_clear_text_parser();
     let encoded_word_parser = get_encoded_word_parser();
 
-    encoded_word_parser
-        .or(clear_text_parser)
+    encoded_word_parser.or(clear_text_parser)
         .repeated()
         .collect::<Tokens>()
 }
@@ -107,14 +104,19 @@ fn get_encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
     let check_encoded_word_length = |token: Token, span| {
-            if token.len() > Token::MAX_ENCODED_WORD_LENGTH {
-                Err(Simple::custom(span, Error::EncodedWordTooLong(token.get_bytes())))
-            } else {
-                Ok(token)
-            }
+        if token.len() > Token::MAX_ENCODED_WORD_LENGTH {
+            Err(Simple::custom(
+                span,
+                Error::EncodedWordTooLong(token.get_bytes()),
+            ))
+        } else {
+            Ok(token)
+        }
     };
 
-    let token = filter(|&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
+    let is_especial = |c: u8| ESPECIAL.contains(&c);
+
+    let token = filter(move |&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
     let charset = token.repeated().collect::<Vec<u8>>();
     let encoding = token.repeated().collect::<Vec<u8>>();
     let encoded_text = filter(|&c: &u8| c != QUESTION_MARK && c != SPACE)
@@ -165,7 +167,9 @@ mod tests {
 
         assert_eq!(
             parsed,
-            vec![Token::ClearText("I use Arch by the way".as_bytes().to_vec())]
+            vec![Token::ClearText(
+                "I use Arch by the way".as_bytes().to_vec()
+            )]
         );
     }
 }

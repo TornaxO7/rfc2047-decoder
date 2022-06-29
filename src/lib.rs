@@ -18,7 +18,7 @@ pub enum Error {
 
 /// Decode a RFC 2047 MIME Message Header.
 ///
-// ```rust
+/// ```ignore
 /// fn main() {
 ///     match rfc2047_decoder::decode("=?utf8?q?str_with_spaces?=".as_bytes()) {
 ///         Ok(s) => println!("{}", s),

@@ -81,18 +81,15 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
 fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
-    let clear_text_parser = get_clear_text_parser();
-    let encoded_word_parser = get_encoded_word_parser();
-
-    clear_text_parser
-        .or(encoded_word_parser
+    clear_text_parser()
+        .or(encoded_word_parser()
             .then_ignore(filter(|c: &u8| c.is_ascii_whitespace()).repeated())
-            .then(encoded_word_parser))
+            .ignore_then(encoded_word_parser()))
         .repeated()
         .collect::<Tokens>()
 }
 
-fn get_clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
+fn clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
     use memchr::memmem::Finder;
 
@@ -116,7 +113,7 @@ fn get_clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     .map(|clear_text| Token::ClearText(clear_text))
 }
 
-fn get_encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
+fn encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
     let check_encoded_word_length = |token: Token, span| {

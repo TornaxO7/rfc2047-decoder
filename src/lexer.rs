@@ -85,13 +85,26 @@ fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     let encoded_word_parser = get_encoded_word_parser();
 
     clear_text_parser
-        .or(encoded_word_parser)
+        .or(encoded_word_parser
+            .then_ignore(filter(|c: &u8| c.is_ascii_whitespace()).repeated())
+            .then(encoded_word_parser))
         .repeated()
         .collect::<Tokens>()
 }
 
 fn get_clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
+    use memchr::memmem::Finder;
+
+    let has_prefix = |clear_text: &Vec<u8>| {
+        let prefix_finder = Finder::new(Token::ENCODED_WORD_PREFIX);
+        prefix_finder.find(&clear_text).is_some()
+    };
+
+    let check_encoded_word_prefix = move |clear_text: Vec<u8>, span| match has_prefix(&clear_text) {
+        true => Err(Simple::custom(span, "")),
+        false => Ok(clear_text),
+    };
 
     filter(|&c: &u8| {
         c.is_ascii_whitespace() || c.is_ascii_alphanumeric() || c.is_ascii_punctuation()
@@ -99,6 +112,7 @@ fn get_clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     .repeated()
     .at_least(1)
     .collect::<Vec<u8>>()
+    .try_map(check_encoded_word_prefix)
     .map(|clear_text| Token::ClearText(clear_text))
 }
 
@@ -231,7 +245,6 @@ mod tests {
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "a".as_bytes().to_vec(),
                 },
-                Token::ClearText(" ".as_bytes().to_vec()),
                 Token::EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),

@@ -84,7 +84,9 @@ fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     clear_text_parser()
         .or(encoded_word_parser()
             .then_ignore(filter(|c: &u8| c.is_ascii_whitespace()).repeated())
-            .ignore_then(encoded_word_parser()))
+            .ignore_then(encoded_word_parser())
+            )
+        .or(encoded_word_parser())
         .repeated()
         .collect::<Tokens>()
 }
@@ -246,6 +248,36 @@ mod tests {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "b".as_bytes().to_vec()
+                }
+            ]
+        );
+    }
+
+    // more custom tests
+    #[test]
+    fn test_multiple_encoded_words() {
+        let parser = get_parser();
+        let message = "=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?= =?ISO-8859-1?Q?c?=".as_bytes();
+
+        let parsed = parser.parse(message).unwrap();
+
+        assert_eq!(
+            parsed,
+            vec![
+                Token::EncodedWord {
+                    charset: "ISO-8859-1".as_bytes().to_vec(),
+                    encoding: "Q".as_bytes().to_vec(),
+                    encoded_text: "a".as_bytes().to_vec(),
+                },
+                Token::EncodedWord {
+                    charset: "ISO-8859-1".as_bytes().to_vec(),
+                    encoding: "Q".as_bytes().to_vec(),
+                    encoded_text: "b".as_bytes().to_vec()
+                },
+                Token::EncodedWord {
+                    charset: "ISO-8859-1".as_bytes().to_vec(),
+                    encoding: "Q".as_bytes().to_vec(),
+                    encoded_text: "c".as_bytes().to_vec()
                 }
             ]
         );

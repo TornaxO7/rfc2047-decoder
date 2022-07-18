@@ -1,8 +1,8 @@
-use chumsky::{prelude::Simple, Parser};
+use chumsky::{prelude::Simple, text::whitespace, Parser};
 
 const QUESTION_MARK: u8 = '?' as u8;
 const SPACE: u8 = ' ' as u8;
-const ESPECIAL: &'static [u8] = "{}<>@,@:/[]?=.".as_bytes();
+const ESPECIALS: &'static [u8] = "{}<>@,@:/[]?=.".as_bytes();
 const AMOUNT_DELIMITERS: usize = "=????=".len();
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -19,7 +19,7 @@ pub enum Error {
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum Token {
-    ClearText(Vec<u8>),
+    ClearText(u8),
     EncodedWord {
         charset: Vec<u8>,
         encoding: Vec<u8>,
@@ -35,7 +35,7 @@ impl Token {
     /// Returns the length of the encoded word including the delimiters
     pub fn len(&self) -> usize {
         match self {
-            Token::ClearText(token) => token.len(),
+            Token::ClearText(_) => 1,
             Token::EncodedWord {
                 charset,
                 encoding,
@@ -46,7 +46,7 @@ impl Token {
 
     pub fn get_bytes(&self) -> Vec<u8> {
         match self {
-            Token::ClearText(token) => token.clone(),
+            Token::ClearText(token) => vec![*token],
             Token::EncodedWord {
                 charset,
                 encoding,
@@ -81,38 +81,24 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
 fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
-    clear_text_parser()
-        .or(encoded_word_parser()
-            .then_ignore(filter(|c: &u8| c.is_ascii_whitespace()).repeated())
-            .ignore_then(encoded_word_parser())
-            )
-        .or(encoded_word_parser())
+    let following_encoded_word = whitespace().repeated().ignore_then(encoded_word_parser());
+    let encoded_words_in_a_row = encoded_word_parser()
+        .chain(following_encoded_word);
+
+    let single_encoded_word = encoded_word_parser().map(|token: Token| vec![token]);
+    let single_clear_text = clear_text_parser().map(|token: Token| vec![token]);
+
+    encoded_words_in_a_row
+        .or(single_encoded_word)
+        .or(single_clear_text)
         .repeated()
-        .collect::<Tokens>()
+        .flatten()
 }
 
 fn clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
-    use memchr::memmem::Finder;
 
-    let has_prefix = |clear_text: &Vec<u8>| {
-        let prefix_finder = Finder::new(Token::ENCODED_WORD_PREFIX);
-        prefix_finder.find(&clear_text).is_some()
-    };
-
-    let check_encoded_word_prefix = move |clear_text: Vec<u8>, span| match has_prefix(&clear_text) {
-        true => Err(Simple::custom(span, "")),
-        false => Ok(clear_text),
-    };
-
-    filter(|&c: &u8| {
-        c.is_ascii_whitespace() || c.is_ascii_alphanumeric() || c.is_ascii_punctuation()
-    })
-    .repeated()
-    .at_least(1)
-    .collect::<Vec<u8>>()
-    .try_map(check_encoded_word_prefix)
-    .map(|clear_text| Token::ClearText(clear_text))
+    any().map(|value: u8| Token::ClearText(value))
 }
 
 fn encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
@@ -129,7 +115,7 @@ fn encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
         }
     };
 
-    let is_especial = |c: u8| ESPECIAL.contains(&c);
+    let is_especial = |c: u8| ESPECIALS.contains(&c);
 
     let token = filter(move |&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
     let charset = token.repeated().at_least(1).collect::<Vec<u8>>();
@@ -154,7 +140,7 @@ mod tests {
     use crate::lexer::Token;
 
     use super::get_parser;
-    use chumsky::Parser;
+    use chumsky::{primitive::Container, Parser};
 
     #[test]
     fn test_encoded_word() {
@@ -182,9 +168,11 @@ mod tests {
 
         assert_eq!(
             parsed,
-            vec![Token::ClearText(
-                "I use Arch by the way".as_bytes().to_vec()
-            )]
+            "I use Arch by the way"
+                .chars()
+                .into_iter()
+                .map(|c: char| Token::ClearText(c as u8))
+                .collect::<Vec<Token>>()
         );
     }
 
@@ -223,7 +211,8 @@ mod tests {
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "a".as_bytes().to_vec(),
                 },
-                Token::ClearText(" b".as_bytes().to_vec())
+                Token::ClearText(b' '),
+                Token::ClearText(b'b'),
             ]
         );
     }
@@ -253,7 +242,8 @@ mod tests {
         );
     }
 
-    // more custom tests
+    /// Test if parser can parse multiple encoded words in a row
+    /// See: https://datatracker.ietf.org/doc/html/rfc2047#section-8
     #[test]
     fn test_multiple_encoded_words() {
         let parser = get_parser();
@@ -278,6 +268,31 @@ mod tests {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "c".as_bytes().to_vec()
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn test_ignore_mutiple_spaces_between_encoded_words() {
+        let parser = get_parser();
+        let message =
+            "=?ISO-8859-1?Q?a?=                               =?ISO-8859-1?Q?b?=".as_bytes();
+
+        let parsed = parser.parse(message).unwrap();
+
+        assert_eq!(
+            parsed,
+            vec![
+                Token::EncodedWord {
+                    charset: "=?ISO-8859-1?Q?a?=".as_bytes().to_vec(),
+                    encoding: "Q".as_bytes().to_vec(),
+                    encoded_text: "a".as_bytes().to_vec(),
+                },
+                Token::EncodedWord {
+                    charset: "=?ISO-8859-1?Q?b?=".as_bytes().to_vec(),
+                    encoding: "Q".as_bytes().to_vec(),
+                    encoded_text: "b".as_bytes().to_vec()
                 }
             ]
         );

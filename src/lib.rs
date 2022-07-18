@@ -31,12 +31,17 @@ pub enum Error {
 ///
 /// The function can return an error if the lexer,
 /// the parser or the evaluator encounters an error.
-pub fn decode<T: AsRef<[u8]>>(encoded_str: T) -> Result<String> {
-    let encoded_word_tokens: lexer::Tokens = lexer::run(encoded_str.as_ref())?;
-    // let encoded_word_parsed = parser::run(encoded_word_tokens)?;
-    // let decoded_str = evaluator::run(&ats)?;
+// pub fn decode<T: AsRef<[u8]>>(encoded_str: T) -> Result<String> {
+//     let encoded_word_tokens: lexer::Tokens = lexer::run(encoded_str.as_ref())?;
+//     // let encoded_word_parsed = parser::run(encoded_word_tokens)?;
+//     // let decoded_str = evaluator::run(&ats)?;
+//
+//     // Ok(decoded_str)
+//     Ok("".to_string())
+// }
 
-    // Ok(decoded_str)
+pub fn decode<T: AsRef<[u8]>>(encoded_str: T) -> Result<String> {
+    let _encoded_word_tokens: lexer::Tokens = lexer::run(encoded_str.as_ref())?;
     Ok("".to_string())
 }
 

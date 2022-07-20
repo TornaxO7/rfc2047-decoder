@@ -81,18 +81,16 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
 fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
-    let following_encoded_word = whitespace().repeated().ignore_then(encoded_word_parser());
-    let encoded_words_in_a_row = encoded_word_parser()
-        .chain(following_encoded_word);
+    let following_encoded_word = whitespace().ignore_then(encoded_word_parser().rewind());
+    let encoded_words_in_a_row = encoded_word_parser().then_ignore(following_encoded_word);
 
-    let single_encoded_word = encoded_word_parser().map(|token: Token| vec![token]);
-    let single_clear_text = clear_text_parser().map(|token: Token| vec![token]);
+    let single_encoded_word = encoded_word_parser();
+    let single_clear_text = clear_text_parser();
 
     encoded_words_in_a_row
         .or(single_encoded_word)
         .or(single_clear_text)
         .repeated()
-        .flatten()
 }
 
 fn clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {

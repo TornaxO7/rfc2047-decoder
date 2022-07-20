@@ -81,8 +81,10 @@ pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
 fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
-    let following_encoded_word = whitespace().ignore_then(encoded_word_parser().rewind());
-    let encoded_words_in_a_row = encoded_word_parser().then_ignore(following_encoded_word);
+    let encoded_words_in_a_row = {
+        let following_encoded_word = whitespace().ignore_then(encoded_word_parser().rewind());
+        encoded_word_parser().then_ignore(following_encoded_word)
+    };
 
     let single_encoded_word = encoded_word_parser();
     let single_clear_text = clear_text_parser();
@@ -283,12 +285,12 @@ mod tests {
             parsed,
             vec![
                 Token::EncodedWord {
-                    charset: "=?ISO-8859-1?Q?a?=".as_bytes().to_vec(),
+                    charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "a".as_bytes().to_vec(),
                 },
                 Token::EncodedWord {
-                    charset: "=?ISO-8859-1?Q?b?=".as_bytes().to_vec(),
+                    charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "b".as_bytes().to_vec()
                 }

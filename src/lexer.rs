@@ -297,4 +297,31 @@ mod tests {
             ]
         );
     }
+
+    /// An encoded word with more then 75 chars should be parsed as a normal cleartext
+    #[test]
+    fn test_too_long_encoded_word() {
+        let parser = get_parser();
+        // "=?" (2) + "ISO-8859-1" (10) + "?" (1) + "Q" (1) + "?" (1) + 'a' (60) + "?=" (2)
+        // = 2 + 10 + 1 + 1 + 60 + 2
+        // = 76
+        let message =
+            "=?ISO-8859-1?Q?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?="
+                .as_bytes();
+        let parsed = parser.parse(message).unwrap();
+
+        let expected = {
+            let mut expected = String::new();
+            expected.push_str("=?ISO-8859-1?Q?");
+            expected.push_str(&"a".repeat(60));
+            expected.push_str("?=");
+            expected
+                .chars()
+                .into_iter()
+                .map(|c: char| Token::ClearText(c as u8))
+                .collect::<Vec<Token>>()
+        };
+
+        assert_eq!(parsed, expected);
+    }
 }

@@ -41,7 +41,7 @@ pub enum Error {
 // }
 
 pub fn decode<T: AsRef<[u8]>>(encoded_str: T) -> Result<String> {
-    let _encoded_word_tokens: lexer::Tokens = lexer::run(encoded_str.as_ref())?;
+    let encoded_word_tokens: lexer::Tokens = lexer::run(encoded_str.as_ref())?;
     Ok("".to_string())
 }
 

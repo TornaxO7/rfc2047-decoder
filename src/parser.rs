@@ -86,14 +86,10 @@ fn convert_to_parsed_encoded_words(
 
     match (previous_field, next) {
         (Some(ParsedEncodedWord::ClearText(chars)), Token::ClearText(new_char)) => {
-            chars.push(new_char);
-            converted.push(ParsedEncodedWord::ClearText(chars));
-            Ok(converted)
+            append_byte(converted, chars, new_char)
         }
-        (None | Some(ParsedEncodedWord::EncodedWord{ .. }), Token::ClearText(new_char)) => {
-            let clear_text = ParsedEncodedWord::ClearText(vec![new_char]);
-            converted.push(clear_text);
-            Ok(converted)
+        (None | Some(ParsedEncodedWord::EncodedWord { .. }), Token::ClearText(new_char)) => {
+            create_new_byte_vec(converted, new_char)
         }
         (
             _,
@@ -102,22 +98,47 @@ fn convert_to_parsed_encoded_words(
                 encoding,
                 encoded_text,
             },
-        ) => {
-            let encoding = Encoding::try_from(encoding)?;
-            let charset = Charset::for_label(&charset).ok_or_else(|| {
-                Error::UnknownCharset(format!("{:?}", charset))
-            })?;
-
-            let converted_encoded_word = ParsedEncodedWord::EncodedWord {
-                charset,
-                encoding,
-                encoded_text,
-            };
-
-            converted.push(converted_encoded_word);
-            Ok(converted)
-        }
+        ) => convert_encoded_word(converted, charset, encoding, encoded_text),
     }
+}
+
+fn append_byte(
+    converted: ParsedEncodedWords,
+    char_buffer: Vec<u8>,
+    new_char: u8,
+) -> Result<ParsedEncodedWords> {
+    char_buffer.push(new_char);
+    converted.push(ParsedEncodedWord::ClearText(char_buffer));
+    Ok(converted)
+}
+
+fn create_new_byte_vec(
+    converted: ParsedEncodedWords,
+    new_char: u8,
+) -> Result<ParsedEncodedWords> {
+    let clear_text = ParsedEncodedWord::ClearText(vec![new_char]);
+    converted.push(clear_text);
+    Ok(converted)
+}
+
+fn convert_encoded_word(
+    converted: ParsedEncodedWords,
+    charset: Vec<u8>,
+    encoding: Vec<u8>,
+    encoded_text: Vec<u8>,
+) -> Result<ParsedEncodedWords> {
+    let encoding = Encoding::try_from(encoding)?;
+    let charset = Charset::for_label(&charset)
+        .ok_or_else(|| Error::UnknownCharset(format!("{:?}", charset)))?;
+
+    let converted_encoded_word = ParsedEncodedWord::EncodedWord {
+        charset,
+        encoding,
+        encoded_text,
+    };
+
+    converted.push(converted_encoded_word);
+    Ok(converted)
 }
 
 #[cfg(test)]

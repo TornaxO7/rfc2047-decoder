@@ -1,8 +1,8 @@
 #![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.1.2")]
 
 mod lexer;
-// mod parser;
-// mod evaluator;
+mod parser;
+mod evaluator;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -10,10 +10,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     #[error(transparent)]
     Lexer(#[from] lexer::Error),
-    // #[error(transparent)]
-    // Parser(#[from] parser::Error),
-    // #[error(transparent)]
-    // Evaluate(#[from] evaluator::Error),
+    #[error(transparent)]
+    Parser(#[from] parser::Error),
+    #[error(transparent)]
+    Evaluate(#[from] evaluator::Error),
 }
 
 /// Decode a RFC 2047 MIME Message Header.
@@ -41,8 +41,11 @@ pub enum Error {
 // }
 
 pub fn decode<T: AsRef<[u8]>>(encoded_str: T) -> Result<String> {
-    let encoded_word_tokens: lexer::Tokens = lexer::run(encoded_str.as_ref())?;
-    Ok("".to_string())
+    let text_tokens: lexer::Tokens = lexer::run(encoded_str.as_ref())?;
+    let parsed_text: parser::ParsedEncodedWords = parser::run(text_tokens)?;
+    let evaluated_string: String = evaluator::run(parsed_text)?;
+
+    Ok(evaluated_string)
 }
 
 #[cfg(test)]

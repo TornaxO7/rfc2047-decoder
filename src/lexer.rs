@@ -140,7 +140,7 @@ mod tests {
     use crate::lexer::Token;
 
     use super::get_parser;
-    use chumsky::{primitive::Container, Parser};
+    use chumsky::Parser;
 
     #[test]
     fn test_encoded_word() {

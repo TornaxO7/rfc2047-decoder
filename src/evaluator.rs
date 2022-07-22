@@ -1,6 +1,6 @@
 use charset::{self, Charset};
 
-use crate::parser::{EncodedWordParsed, Encoding};
+use crate::parser::{Encoding, ParsedEncodedWords, ParsedEncodedWord};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -56,7 +56,7 @@ pub fn decode_with_charset(charset: &Vec<u8>, decoded_bytes: &Vec<u8>) -> Result
     Ok(decoded_str.into_owned())
 }
 
-pub fn run(encoded_word_parsed: EncodedWordParsed) -> Result<String> {
+pub fn run(parsed_encoded_words: ParsedEncodedWords) -> Result<String> {
 
     let mut output = String::new();
 

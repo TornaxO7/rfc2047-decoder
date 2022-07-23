@@ -19,7 +19,7 @@ pub enum Error {
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum Token {
-    ClearText(u8),
+    ClearText(Vec<u8>),
     EncodedWord {
         charset: Vec<u8>,
         encoding: Vec<u8>,
@@ -46,7 +46,7 @@ impl Token {
 
     pub fn get_bytes(&self) -> Vec<u8> {
         match self {
-            Token::ClearText(token) => vec![*token],
+            Token::ClearText(token) => (*token).clone(),
             Token::EncodedWord {
                 charset,
                 encoding,
@@ -98,7 +98,8 @@ fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
 fn clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
-    any().map(|value: u8| Token::ClearText(value))
+    take_until(encoded_word_parser().rewind().ignored().or(end().ignored()))
+        .map(|(chars, _): (Vec<u8>, _)| Token::ClearText(chars))
 }
 
 fn encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
@@ -168,11 +169,9 @@ mod tests {
 
         assert_eq!(
             parsed,
-            "I use Arch by the way"
-                .chars()
-                .into_iter()
-                .map(|c: char| Token::ClearText(c as u8))
-                .collect::<Vec<Token>>()
+            vec![Token::ClearText(
+                "I use Arch by the way".as_bytes().to_vec()
+            )]
         );
     }
 
@@ -211,8 +210,7 @@ mod tests {
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "a".as_bytes().to_vec(),
                 },
-                Token::ClearText(b' '),
-                Token::ClearText(b'b'),
+                Token::ClearText(" b".as_bytes().to_vec()),
             ]
         );
     }
@@ -310,18 +308,8 @@ mod tests {
                 .as_bytes();
         let parsed = parser.parse(message).unwrap();
 
-        let expected = {
-            let mut expected = String::new();
-            expected.push_str("=?ISO-8859-1?Q?");
-            expected.push_str(&"a".repeat(60));
-            expected.push_str("?=");
-            expected
-                .chars()
-                .into_iter()
-                .map(|c: char| Token::ClearText(c as u8))
-                .collect::<Vec<Token>>()
-        };
-
-        assert_eq!(parsed, expected);
+        assert_eq!(parsed, vec![
+            Token::ClearText(message.to_vec()),
+        ]);
     }
 }

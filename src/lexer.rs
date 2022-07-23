@@ -98,7 +98,7 @@ fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
 fn clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
-    take_until(encoded_word_parser().rewind().ignored().or(end().ignored()))
+    take_until(encoded_word_parser().rewind().ignored().or(end()))
         .map(|(chars, _): (Vec<u8>, _)| Token::ClearText(chars))
 }
 

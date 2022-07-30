@@ -1,30 +1,25 @@
-use charset::{self, Charset};
+use charset::Charset;
 
-use crate::parser::{Encoding, ParsedEncodedWords, ParsedEncodedWord};
+use crate::parser::{Encoding, ParsedEncodedWord, ParsedEncodedWords, ClearText};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    DecodeUtf8Error(#[from] std::str::Utf8Error),
+    DecodeUtf8Error(#[from] std::string::FromUtf8Error),
     #[error(transparent)]
     DecodeBase64Error(#[from] base64::DecodeError),
     #[error(transparent)]
     DecodeQuotedPrintableError(#[from] quoted_printable::QuotedPrintableError),
 }
 
-fn decode_utf8(encoded_bytes: &Vec<u8>) -> Result<&str> {
-    let decoded_bytes = std::str::from_utf8(&encoded_bytes)?;
+fn decode_base64(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
+    let decoded_bytes = base64::decode(encoded_bytes)?;
     Ok(decoded_bytes)
 }
 
-fn decode_base64(encoded_bytes: &Vec<u8>) -> Result<Vec<u8>> {
-    let decoded_bytes = base64::decode(&encoded_bytes)?;
-    Ok(decoded_bytes)
-}
-
-fn decode_quoted_printable(encoded_bytes: &Vec<u8>) -> Result<Vec<u8>> {
+fn decode_quoted_printable(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
     let parse_mode = quoted_printable::ParseMode::Robust;
 
     const SPACE: u8 = ' ' as u8;
@@ -40,39 +35,54 @@ fn decode_quoted_printable(encoded_bytes: &Vec<u8>) -> Result<Vec<u8>> {
     Ok(decoded_bytes)
 }
 
-pub fn decode_with_encoding(encoding: char, encoded_bytes: &Vec<u8>) -> Result<Vec<u8>> {
-    match encoding.to_uppercase().next() {
-        Some('B') => decode_base64(encoded_bytes),
-        Some('Q') | _ => decode_quoted_printable(encoded_bytes),
+fn decode_with_encoding(encoding: Encoding, encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
+    match encoding {
+        Encoding::B => decode_base64(encoded_bytes),
+        Encoding::Q => decode_quoted_printable(encoded_bytes),
+
     }
 }
 
-pub fn decode_with_charset(charset: &Vec<u8>, decoded_bytes: &Vec<u8>) -> Result<String> {
-    let decoded_str = match Charset::for_label(charset) {
-        Some(charset) => charset.decode(decoded_bytes).0,
-        None => charset::decode_ascii(decoded_bytes),
+fn decode_with_charset(charset: Option<Charset>, decoded_bytes: Vec<u8>) -> Result<String> {
+
+    let decoded_str = match charset {
+        Some(charset) => charset.decode(&decoded_bytes).0,
+        None => charset::decode_ascii(&decoded_bytes),
     };
 
     Ok(decoded_str.into_owned())
 }
 
+fn decode_utf8_string(clear_text: ClearText) -> Result<String> {
+    let decoded_bytes = String::from_utf8(clear_text)?;
+    Ok(decoded_bytes)
+}
+
+fn decode_parsed_encoded_word(
+    charset: Option<Charset>,
+    encoding: Encoding,
+    encoded_text: Vec<u8>,
+) -> Result<String> {
+    let decoded_bytes = decode_with_encoding(encoding, encoded_text)?;
+    let decoded_str = decode_with_charset(charset, decoded_bytes)?;
+    Ok(decoded_str)
+}
+
 pub fn run(parsed_encoded_words: ParsedEncodedWords) -> Result<String> {
+    let message = parsed_encoded_words
+        .into_iter()
+        .map(
+            |parsed_encoded_word: ParsedEncodedWord| match parsed_encoded_word {
+                ParsedEncodedWord::ClearText(clear_text) => decode_utf8_string(clear_text),
+                ParsedEncodedWord::EncodedWord {
+                    charset,
+                    encoding,
+                    encoded_text,
+                } => decode_parsed_encoded_word(charset, encoding, encoded_text),
+            },
+        )
+        .flatten()
+        .collect();
 
-    let mut output = String::new();
-
-    for node in ast {
-        match node {
-            EncodedBytes(node) => {
-                let decoded_bytes = decode_with_encoding(node.encoding, &node.bytes)?;
-                let decoded_str = decode_with_charset(&node.charset, &decoded_bytes)?;
-                output.push_str(&decoded_str);
-            }
-            ClearBytes(clear_bytes) => {
-                let clear_str = decode_utf8(&clear_bytes)?;
-                output.push_str(clear_str);
-            }
-        }
-    }
-
-    Ok(output)
+    Ok(message)
 }

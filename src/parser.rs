@@ -42,32 +42,22 @@ impl TryFrom<Vec<u8>> for Encoding {
 
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum ParsedEncodedWord {
-    ClearText(Vec<u8>),
+    ClearText(ClearText),
     EncodedWord {
-        charset: Charset,
+        charset: Option<Charset>,
         encoding: Encoding,
         encoded_text: Vec<u8>,
     },
 }
 
 impl ParsedEncodedWord {
-
-    pub fn collect_clear_bytes<'a>(iter: &mut (dyn Iterator<Item = Token> + 'a)) -> ParsedEncodedWord {
-        let mut char_buffer = Vec::new();
-        while let Some(Token::ClearText(new_char)) = iter.next() {
-            char_buffer.push(new_char);
-        }
-        Self::ClearText(char_buffer)
-    }
-
     pub fn convert_encoded_word(
         charset: Vec<u8>,
         encoding: Vec<u8>,
         encoded_text: Vec<u8>,
     ) -> Result<Self> {
         let encoding = Encoding::try_from(encoding)?;
-        let charset = Charset::for_label(&charset)
-            .ok_or_else(|| Error::UnknownCharset(format!("{:?}", charset)))?;
+        let charset = Charset::for_label(&charset);
 
         Ok(Self::EncodedWord {
             charset,
@@ -98,23 +88,14 @@ pub fn run(tokens: Tokens) -> Result<ParsedEncodedWords> {
 }
 
 fn convert_tokens_to_encoded_words(tokens: Tokens) -> Result<ParsedEncodedWords> {
-    let mut parsed_encoded_words = ParsedEncodedWords::new();
-    let mut iter = tokens.into_iter();
-
-    while let Some(next) = iter.next() {
-        let parsed_token = match next {
-            Token::ClearText(_) => ParsedEncodedWord::collect_clear_bytes(&mut iter),
-            Token::EncodedWord {
-                charset,
-                encoding,
-                encoded_text,
-            } => ParsedEncodedWord::convert_encoded_word(charset, encoding, encoded_text)?,
-        };
-
-        parsed_encoded_words.push(parsed_token);
-    }
-
-    Ok(parsed_encoded_words)
+    tokens.into_iter().map(|token: Token| match token {
+        Token::ClearText(clear_text) => Ok(ParsedEncodedWord::ClearText(clear_text)),
+        Token::EncodedWord {
+            charset,
+            encoding,
+            encoded_text,
+        } => ParsedEncodedWord::convert_encoded_word(charset, encoding, encoded_text),
+    }).collect()
 }
 
 #[cfg(test)]
@@ -137,7 +118,7 @@ mod tests {
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {
-            charset: Charset::for_label("US-ASCII".as_bytes()).unwrap(),
+            charset: Charset::for_label("US-ASCII".as_bytes()),
             encoding: Encoding::Q,
             encoded_text: "Keith_Moore".as_bytes().to_vec(),
         }];
@@ -156,7 +137,7 @@ mod tests {
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {
-            charset: Charset::for_label("ISO-8859-1".as_bytes()).unwrap(),
+            charset: Charset::for_label("ISO-8859-1".as_bytes()),
             encoding: Encoding::Q,
             encoded_text: "Keld_J=F8rn_Simonsen".as_bytes().to_vec(),
         }];
@@ -175,7 +156,7 @@ mod tests {
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {
-            charset: Charset::for_label("ISO-8859-1".as_bytes()).unwrap(),
+            charset: Charset::for_label("ISO-8859-1".as_bytes()),
             encoding: Encoding::Q,
             encoded_text: "Andr=E9".as_bytes().to_vec(),
         }];
@@ -194,7 +175,7 @@ mod tests {
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {
-            charset: Charset::for_label("ISO-8859-1".as_bytes()).unwrap(),
+            charset: Charset::for_label("ISO-8859-1".as_bytes()),
             encoding: Encoding::B,
             encoded_text: "SWYgeW91IGNhbiByZWFkIHRoaXMgeW8=".as_bytes().to_vec(),
         }];

@@ -98,8 +98,17 @@ fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
 fn clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
-    take_until(encoded_word_parser().rewind().ignored().or(end()))
-        .map(|(chars, _): (Vec<u8>, _)| Token::ClearText(chars))
+    const DEFAULT_EMPTY_INPUT_ERROR_MESSAGE: &str = "got empty input";
+
+    take_until(encoded_word_parser().rewind().ignored().or(end())).try_map(
+        |(chars, ()): (Vec<u8>, ()), span| {
+            if chars.is_empty() {
+                Err(Simple::custom(span, DEFAULT_EMPTY_INPUT_ERROR_MESSAGE))
+            } else {
+                Ok(Token::ClearText(chars))
+            }
+        },
+    )
 }
 
 fn encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
@@ -308,8 +317,6 @@ mod tests {
                 .as_bytes();
         let parsed = parser.parse(message).unwrap();
 
-        assert_eq!(parsed, vec![
-            Token::ClearText(message.to_vec()),
-        ]);
+        assert_eq!(parsed, vec![Token::ClearText(message.to_vec()),]);
     }
 }

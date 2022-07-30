@@ -317,6 +317,6 @@ mod tests {
                 .as_bytes();
         let parsed = parser.parse(message).unwrap();
 
-        assert_eq!(parsed, vec![Token::ClearText(message.to_vec()),]);
+        assert_eq!(parsed, vec![Token::ClearText(message.to_vec())]);
     }
 }

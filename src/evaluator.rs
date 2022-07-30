@@ -7,11 +7,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    DecodeUtf8Error(#[from] std::string::FromUtf8Error),
+    DecodeUtf8(#[from] std::string::FromUtf8Error),
     #[error(transparent)]
-    DecodeBase64Error(#[from] base64::DecodeError),
+    DecodeBase64(#[from] base64::DecodeError),
     #[error(transparent)]
-    DecodeQuotedPrintableError(#[from] quoted_printable::QuotedPrintableError),
+    DecodeQuotedPrintable(#[from] quoted_printable::QuotedPrintableError),
 }
 
 fn decode_base64(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
@@ -22,8 +22,8 @@ fn decode_base64(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
 fn decode_quoted_printable(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
     let parse_mode = quoted_printable::ParseMode::Robust;
 
-    const SPACE: u8 = ' ' as u8;
-    const UNDERSCORE: u8 = '_' as u8;
+    const SPACE: u8 = b' ';
+    const UNDERSCORE: u8 = b'_';
 
     let encoded_bytes = encoded_bytes
         .iter()
@@ -71,7 +71,7 @@ fn decode_parsed_encoded_word(
 pub fn run(parsed_encoded_words: ParsedEncodedWords) -> Result<String> {
     let message = parsed_encoded_words
         .into_iter()
-        .map(
+        .flat_map(
             |parsed_encoded_word: ParsedEncodedWord| match parsed_encoded_word {
                 ParsedEncodedWord::ClearText(clear_text) => decode_utf8_string(clear_text),
                 ParsedEncodedWord::EncodedWord {
@@ -81,7 +81,6 @@ pub fn run(parsed_encoded_words: ParsedEncodedWords) -> Result<String> {
                 } => decode_parsed_encoded_word(charset, encoding, encoded_text),
             },
         )
-        .flatten()
         .collect();
 
     Ok(message)

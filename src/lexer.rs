@@ -1,8 +1,8 @@
 use chumsky::{prelude::Simple, text::whitespace, Parser};
 use std::collections::HashSet;
 
-const QUESTION_MARK: u8 = '?' as u8;
-const SPACE: u8 = ' ' as u8;
+const QUESTION_MARK: u8 = b'?';
+const SPACE: u8 = b' ';
 const AMOUNT_DELIMITERS: usize = "=????=".len();
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -75,7 +75,7 @@ impl Token {
 pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
     let encoded_word = get_parser().parse(encoded_bytes);
 
-    encoded_word.map_err(|err| Error::EncodingIssue(err))
+    encoded_word.map_err(Error::EncodingIssue)
 }
 
 fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {

@@ -1,8 +1,8 @@
 use chumsky::{prelude::Simple, text::whitespace, Parser};
+use std::collections::HashSet;
 
 const QUESTION_MARK: u8 = '?' as u8;
 const SPACE: u8 = ' ' as u8;
-const ESPECIALS: &'static [u8] = "{}<>@,@:/[]?=.".as_bytes();
 const AMOUNT_DELIMITERS: usize = "=????=".len();
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -125,9 +125,10 @@ fn encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
         }
     };
 
-    let is_especial = |c: u8| ESPECIALS.contains(&c);
+    let is_especial = |c: u8| get_especials().contains(&c);
 
     let token = filter(move |&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
+    // let token = none_of(ESPECIAL);
     let charset = token.repeated().at_least(1).collect::<Vec<u8>>();
     let encoding = token.repeated().at_least(1).collect::<Vec<u8>>();
     let encoded_text = filter(|&c: &u8| c != QUESTION_MARK && c != SPACE)
@@ -143,6 +144,10 @@ fn encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
         .then_ignore(just(Token::ENCODED_WORD_SUFFIX))
         .map(Token::get_encoded_word)
         .try_map(check_encoded_word_length)
+}
+
+fn get_especials() -> HashSet<u8> {
+    "()<>@,;:/[]?.=".bytes().collect()
 }
 
 #[cfg(test)]
@@ -315,6 +320,15 @@ mod tests {
         let message =
             "=?ISO-8859-1?Q?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?="
                 .as_bytes();
+        let parsed = parser.parse(message).unwrap();
+
+        assert_eq!(parsed, vec![Token::ClearText(message.to_vec())]);
+    }
+
+    #[test]
+    fn test_encoded_word_has_especials() {
+        let parser = get_parser();
+        let message = "=?ISO-8859-1(?Q?a?=".as_bytes();
         let parsed = parser.parse(message).unwrap();
 
         assert_eq!(parsed, vec![Token::ClearText(message.to_vec())]);

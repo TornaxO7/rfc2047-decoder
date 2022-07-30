@@ -128,7 +128,6 @@ fn encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     let is_especial = |c: u8| get_especials().contains(&c);
 
     let token = filter(move |&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
-    // let token = none_of(ESPECIAL);
     let charset = token.repeated().at_least(1).collect::<Vec<u8>>();
     let encoding = token.repeated().at_least(1).collect::<Vec<u8>>();
     let encoded_text = filter(|&c: &u8| c != QUESTION_MARK && c != SPACE)
@@ -315,8 +314,8 @@ mod tests {
     fn test_too_long_encoded_word() {
         let parser = get_parser();
         // "=?" (2) + "ISO-8859-1" (10) + "?" (1) + "Q" (1) + "?" (1) + 'a' (60) + "?=" (2)
-        // = 2 + 10 + 1 + 1 + 60 + 2
-        // = 76
+        // = 2 + 10 + 1 + 1 + 1 + 60 + 2
+        // = 77 => too long
         let message =
             "=?ISO-8859-1?Q?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?="
                 .as_bytes();

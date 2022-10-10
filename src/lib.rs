@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.1.2")]
+#![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.1.3")]
 
 mod evaluator;
 mod lexer;

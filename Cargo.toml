@@ -1,15 +1,15 @@
 [package]
 name = "rfc2047-decoder"
-description = "Simple RFC 2047 MIME Message Header decoder"
-version = "0.1.2" # remember to update html_root_url
-authors = ["soywod <clement.douin@posteo.net>"]
+description = "Rust library for decoding RFC 2047 MIME Message Headers."
+version = "0.1.3" # remember to update html_root_url
+authors = ["soywod <clement.douin@posteo.net>", "TornaxO7 <tornax07@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/soywod/rfc2047-decoder"
 documentation = "https://docs.rs/rfc2047-decoder"
 homepage = "https://github.com/soywod/rfc2047-decoder"
 categories = ["email", "encoding", "parsing", "parser-implementations"]
 keywords = ["rfc2047", "mime", "header", "decoder", "decoding"]
-license = "BSD-3-Clause"
+license = "MIT"
 readme = "README.md"
 
 [lib]
@@ -18,7 +18,7 @@ name = "rfc2047_decoder"
 [dependencies]
 base64 = "0.13.0"
 charset = "0.1.2"
-quoted_printable = "0.4.2"
-thiserror = "1.0.31"
 chumsky = "0.8.0"
 memchr = "2.5.0"
+quoted_printable = "0.4.2"
+thiserror = "1.0.31"

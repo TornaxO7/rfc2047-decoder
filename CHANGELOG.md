@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* Added Nix support
 * Allowed decoding strings bigger than 76 chars [#15]
 
 ### Changed

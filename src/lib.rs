@@ -178,5 +178,13 @@ mod tests {
                 "str with special çhàrß"
             );
         }
+
+        #[test]
+        fn utf8_b64_trailing_bit() {
+            assert_ok(
+                "Portale HackingTeam",
+                "=?utf-8?B?UG9ydGFsZSBIYWNraW5nVGVhbW==?=",
+            );
+        }
     }
 }

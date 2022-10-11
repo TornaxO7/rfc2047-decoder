@@ -5,14 +5,12 @@ use crate::lexer::{Token, Tokens};
 
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum Error {
-    #[error("Unknown charset: {}", .0)]
-    UnknownCharset(String),
-    #[error("Unknown encoding: {}. Encoding can be only either 'Q' or 'B'.", .0)]
-    UnknownEncoding(char),
-    #[error("The encoded word is too big")]
-    EncodedWordTooBig,
-    #[error("Encoding is empty")]
-    EmptyEncoding,
+    #[error("cannot parse encoding: encoding is bigger than a char")]
+    ParseEncodingTooBigError,
+    #[error("cannot parse encoding: encoding is empty")]
+    ParseEncodingEmptyError,
+    #[error("cannot parse encoding {0}: B or Q is expected")]
+    ParseEncodingError(char),
 }
 
 type Result<T> = result::Result<T, Error>;
@@ -29,25 +27,24 @@ pub enum Encoding {
 impl Encoding {
     pub const B_CHAR: char = 'b';
     pub const Q_CHAR: char = 'q';
-    pub const ENCODING_LENGTH: usize = 1;
+    pub const MAX_LENGTH: usize = 1;
 }
 
 impl TryFrom<Vec<u8>> for Encoding {
     type Error = Error;
 
     fn try_from(token: Vec<u8>) -> Result<Self> {
-        if token.len() > Self::ENCODING_LENGTH {
-            return Err(Error::EncodedWordTooBig);
+        if token.len() > Self::MAX_LENGTH {
+            return Err(Error::ParseEncodingTooBigError);
         }
 
-        let encoding = token.first().ok_or(Error::EmptyEncoding)?;
+        let encoding = token.first().ok_or(Error::ParseEncodingEmptyError)?;
         let encoding = *encoding as char;
-        let encoding = encoding.to_ascii_lowercase();
 
-        match encoding {
+        match encoding.to_ascii_lowercase() {
             Encoding::Q_CHAR => Ok(Self::Q),
             Encoding::B_CHAR => Ok(Self::B),
-            _ => Err(Error::UnknownEncoding(encoding)),
+            _ => Err(Error::ParseEncodingError(encoding)),
         }
     }
 }

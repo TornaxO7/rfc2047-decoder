@@ -18,7 +18,7 @@ pub type Result<T> = result::Result<T, Error>;
 /// Represents the decoder builder.
 ///
 /// ```
-/// let decoder = Decoder::new().skip_encoded_word_length(true);
+/// let decoder = rfc2047_decoder::Decoder::new().skip_encoded_word_length(true);
 /// let decoded_str = decoder.decode("=?UTF-8?B?c3Ry?=");
 /// ```
 #[derive(Debug, Default, Clone, Eq, PartialEq)]

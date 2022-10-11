@@ -6,10 +6,10 @@ use crate::Decoder;
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum Error {
-    #[error("Couldn't get tokens from: {:?}", .0)]
-    EncodingIssue(Vec<Simple<u8>>),
-    #[error("The encoded word is too long: {:?}", .0)]
-    EncodedWordTooLong(Vec<u8>),
+    #[error("cannot parse bytes into tokens")]
+    ParseBytesError(Vec<Simple<u8>>),
+    #[error("cannot parse encoded word: encoded word too long")]
+    ParseEncodedWordTooLongError(Vec<u8>),
 }
 
 type Result<T> = result::Result<T, Error>;
@@ -76,8 +76,9 @@ impl Token {
 }
 
 pub fn run(encoded_bytes: &[u8], decoder: Decoder) -> Result<Tokens> {
-    let encoded_word = get_parser(decoder).parse(encoded_bytes);
-    encoded_word.map_err(Error::EncodingIssue)
+    get_parser(decoder)
+        .parse(encoded_bytes)
+        .map_err(Error::ParseBytesError)
 }
 
 fn get_parser(decoder: Decoder) -> impl Parser<u8, Tokens, Error = Simple<u8>> {
@@ -123,7 +124,7 @@ fn encoded_word_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simp
         if !skip_encoded_word_length && token.len() > Token::MAX_ENCODED_WORD_LENGTH {
             Err(Simple::custom(
                 span,
-                Error::EncodedWordTooLong(token.get_bytes()),
+                Error::ParseEncodedWordTooLongError(token.get_bytes()),
             ))
         } else {
             Ok(token)

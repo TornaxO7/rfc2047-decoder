@@ -1,17 +1,18 @@
 use base64::{CharacterSet, Config};
 use charset::Charset;
 use std::{result, string};
+use thiserror::Error;
 
 use crate::parser::{ClearText, Encoding, ParsedEncodedWord, ParsedEncodedWords};
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    DecodeUtf8(#[from] string::FromUtf8Error),
+    DecodeUtf8Error(#[from] string::FromUtf8Error),
     #[error(transparent)]
-    DecodeBase64(#[from] base64::DecodeError),
+    DecodeBase64Error(#[from] base64::DecodeError),
     #[error(transparent)]
-    DecodeQuotedPrintable(#[from] quoted_printable::QuotedPrintableError),
+    DecodeQuotedPrintableError(#[from] quoted_printable::QuotedPrintableError),
 }
 
 type Result<T> = result::Result<T, Error>;

@@ -7,9 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-* Fixed decoding strings bigger than 76 chars [#15]
+* Allowed decoding strings bigger than 76 chars [#15]
+
+### Changed
+
+* Renamed error variants to match the [Rust API
+  guidelines](https://rust-lang.github.io/api-guidelines/naming.html#names-use-a-consistent-word-order-c-word-order):
+  * `lexer::Error::EncodingIssue` becomes `ParseBytesError`
+  * `lexer::Error::EncodedWordTooLong` becomes
+    `ParseEncodedWordTooLongError`
+  * `parser::Error::UnknownCharset` becomes `ParseEncodingError`
+  * `parser::Error::UnknownCharset` has been removed (unused)
+  * `parser::Error::UnknownEncoding` becomes `ParseEncodingError`
+  * `parser::Error::EncodedWordTooBig` becomes
+    `ParseEncodingTooBigError`
+  * `parser::Error::EmptyEncoding` becomes `ParseEncodingEmptyError`
+  * `evaluator::Error::DecodeUtf8` becomes `DecodeUtf8Error`
+  * `evaluator::Error::DecodeBase64` becomes `DecodeBase64Error`
+  * `evaluator::Error::DecodeQuotedPrintable` becomes
+    `DecodeQuotedPrintableError`
 
 ## [0.1.3] - 2022-10-10
 

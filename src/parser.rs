@@ -1,10 +1,20 @@
 use charset::Charset;
+use std::{convert::TryFrom, result};
 
 use crate::lexer::{Token, Tokens};
 
-use std::convert::TryFrom;
+#[derive(thiserror::Error, Debug, Clone)]
+pub enum Error {
+    #[error("cannot parse encoding: encoding is bigger than a char")]
+    ParseEncodingTooBigError,
+    #[error("cannot parse encoding: encoding is empty")]
+    ParseEncodingEmptyError,
+    #[error("cannot parse encoding {0}: B or Q is expected")]
+    ParseEncodingError(char),
+}
 
-pub type Result<T> = std::result::Result<T, Error>;
+type Result<T> = result::Result<T, Error>;
+
 pub type ClearText = Vec<u8>;
 pub type ParsedEncodedWords = Vec<ParsedEncodedWord>;
 
@@ -17,25 +27,24 @@ pub enum Encoding {
 impl Encoding {
     pub const B_CHAR: char = 'b';
     pub const Q_CHAR: char = 'q';
-    pub const ENCODING_LENGTH: usize = 1;
+    pub const MAX_LENGTH: usize = 1;
 }
 
 impl TryFrom<Vec<u8>> for Encoding {
     type Error = Error;
 
     fn try_from(token: Vec<u8>) -> Result<Self> {
-        if token.len() > Self::ENCODING_LENGTH {
-            return Err(Error::EncodedWordTooBig);
+        if token.len() > Self::MAX_LENGTH {
+            return Err(Error::ParseEncodingTooBigError);
         }
 
-        let encoding = token.first().ok_or(Error::EmptyEncoding)?;
+        let encoding = token.first().ok_or(Error::ParseEncodingEmptyError)?;
         let encoding = *encoding as char;
-        let encoding = encoding.to_ascii_lowercase();
 
-        match encoding {
+        match encoding.to_ascii_lowercase() {
             Encoding::Q_CHAR => Ok(Self::Q),
             Encoding::B_CHAR => Ok(Self::B),
-            _ => Err(Error::UnknownEncoding(encoding)),
+            _ => Err(Error::ParseEncodingError(encoding)),
         }
     }
 }
@@ -67,45 +76,34 @@ impl ParsedEncodedWord {
     }
 }
 
-#[derive(thiserror::Error, Debug, Clone)]
-pub enum Error {
-    #[error("Unknown charset: {}", .0)]
-    UnknownCharset(String),
-
-    #[error("Unknown encoding: {}. Encoding can be only either 'Q' or 'B'.", .0)]
-    UnknownEncoding(char),
-
-    #[error("The encoded word is too big")]
-    EncodedWordTooBig,
-
-    #[error("Encoding is empty")]
-    EmptyEncoding,
-}
-
 pub fn run(tokens: Tokens) -> Result<ParsedEncodedWords> {
     let parsed_encoded_words = convert_tokens_to_encoded_words(tokens)?;
     Ok(parsed_encoded_words)
 }
 
 fn convert_tokens_to_encoded_words(tokens: Tokens) -> Result<ParsedEncodedWords> {
-    tokens.into_iter().map(|token: Token| match token {
-        Token::ClearText(clear_text) => Ok(ParsedEncodedWord::ClearText(clear_text)),
-        Token::EncodedWord {
-            charset,
-            encoding,
-            encoded_text,
-        } => ParsedEncodedWord::convert_encoded_word(charset, encoding, encoded_text),
-    }).collect()
+    tokens
+        .into_iter()
+        .map(|token: Token| match token {
+            Token::ClearText(clear_text) => Ok(ParsedEncodedWord::ClearText(clear_text)),
+            Token::EncodedWord {
+                charset,
+                encoding,
+                encoded_text,
+            } => ParsedEncodedWord::convert_encoded_word(charset, encoding, encoded_text),
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
-
     use charset::Charset;
 
-    use crate::lexer;
-    use crate::parser;
-    use crate::parser::{Encoding, ParsedEncodedWord};
+    use crate::{
+        lexer,
+        parser::{self, Encoding, ParsedEncodedWord},
+        Decoder,
+    };
 
     /// Example taken from:
     /// https://datatracker.ietf.org/doc/html/rfc2047#section-8
@@ -114,7 +112,7 @@ mod tests {
     #[test]
     fn test_parse1() {
         let message = "=?US-ASCII?Q?Keith_Moore?=".as_bytes();
-        let tokens = lexer::run(&message).unwrap();
+        let tokens = lexer::run(&message, Decoder::new()).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {
@@ -133,7 +131,7 @@ mod tests {
     #[test]
     fn test_parse2() {
         let message = "=?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?=".as_bytes();
-        let tokens = lexer::run(&message).unwrap();
+        let tokens = lexer::run(&message, Decoder::new()).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {
@@ -152,7 +150,7 @@ mod tests {
     #[test]
     fn test_parse3() {
         let message = "=?ISO-8859-1?Q?Andr=E9?=".as_bytes();
-        let tokens = lexer::run(&message).unwrap();
+        let tokens = lexer::run(&message, Decoder::new()).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {
@@ -171,7 +169,7 @@ mod tests {
     #[test]
     fn test_parse4() {
         let message = "=?ISO-8859-1?B?SWYgeW91IGNhbiByZWFkIHRoaXMgeW8=?=".as_bytes();
-        let tokens = lexer::run(&message).unwrap();
+        let tokens = lexer::run(&message, Decoder::new()).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {

@@ -1,21 +1,24 @@
 use chumsky::{prelude::Simple, text::whitespace, Parser};
-use std::collections::HashSet;
+use std::{collections::HashSet, result};
+use thiserror::Error;
+
+use crate::Decoder;
+
+#[derive(Error, Debug, Clone, PartialEq)]
+pub enum Error {
+    #[error("cannot parse bytes into tokens")]
+    ParseBytesError(Vec<Simple<u8>>),
+    #[error("cannot parse encoded word: encoded word too long")]
+    ParseEncodedWordTooLongError(Vec<u8>),
+}
+
+type Result<T> = result::Result<T, Error>;
 
 const QUESTION_MARK: u8 = b'?';
 const SPACE: u8 = b' ';
 const AMOUNT_DELIMITERS: usize = "=????=".len();
 
-pub type Result<T> = std::result::Result<T, Error>;
 pub type Tokens = Vec<Token>;
-
-#[derive(thiserror::Error, Debug, Clone, PartialEq)]
-pub enum Error {
-    #[error("Couldn't get tokens from: {:?}", .0)]
-    EncodingIssue(Vec<Simple<u8>>),
-
-    #[error("The encoded word is too long: {:?}", .0)]
-    EncodedWordTooLong(Vec<u8>),
-}
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum Token {
@@ -72,22 +75,23 @@ impl Token {
     }
 }
 
-pub fn run(encoded_bytes: &[u8]) -> Result<Tokens> {
-    let encoded_word = get_parser().parse(encoded_bytes);
-
-    encoded_word.map_err(Error::EncodingIssue)
+pub fn run(encoded_bytes: &[u8], decoder: Decoder) -> Result<Tokens> {
+    get_parser(decoder)
+        .parse(encoded_bytes)
+        .map_err(Error::ParseBytesError)
 }
 
-fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
+fn get_parser(decoder: Decoder) -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
     let encoded_words_in_a_row = {
-        let following_encoded_word = whitespace().ignore_then(encoded_word_parser().rewind());
-        encoded_word_parser().then_ignore(following_encoded_word)
+        let following_encoded_word =
+            whitespace().ignore_then(encoded_word_parser(&decoder).rewind());
+        encoded_word_parser(&decoder).then_ignore(following_encoded_word)
     };
 
-    let single_encoded_word = encoded_word_parser();
-    let single_clear_text = clear_text_parser();
+    let single_encoded_word = encoded_word_parser(&decoder);
+    let single_clear_text = clear_text_parser(&decoder);
 
     encoded_words_in_a_row
         .or(single_encoded_word)
@@ -95,13 +99,13 @@ fn get_parser() -> impl Parser<u8, Tokens, Error = Simple<u8>> {
         .repeated()
 }
 
-fn clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
+fn clear_text_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
     const DEFAULT_EMPTY_INPUT_ERROR_MESSAGE: &str = "got empty input";
 
-    take_until(encoded_word_parser().rewind().ignored().or(end())).try_map(
-        |(chars, ()): (Vec<u8>, ()), span| {
+    take_until(encoded_word_parser(&decoder).rewind().ignored().or(end())).try_map(
+        |(chars, ()), span| {
             if chars.is_empty() {
                 Err(Simple::custom(span, DEFAULT_EMPTY_INPUT_ERROR_MESSAGE))
             } else {
@@ -111,14 +115,16 @@ fn clear_text_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
     )
 }
 
-fn encoded_word_parser() -> impl Parser<u8, Token, Error = Simple<u8>> {
+fn encoded_word_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
-    let check_encoded_word_length = |token: Token, span| {
-        if token.len() > Token::MAX_ENCODED_WORD_LENGTH {
+    let skip_encoded_word_length = decoder.skip_encoded_word_length;
+
+    let check_encoded_word_length = move |token: Token, span| {
+        if !skip_encoded_word_length && token.len() > Token::MAX_ENCODED_WORD_LENGTH {
             Err(Simple::custom(
                 span,
-                Error::EncodedWordTooLong(token.get_bytes()),
+                Error::ParseEncodedWordTooLongError(token.get_bytes()),
             ))
         } else {
             Ok(token)
@@ -151,14 +157,14 @@ fn get_especials() -> HashSet<u8> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::Token;
+    use crate::{lexer::Token, Decoder};
 
     use super::get_parser;
     use chumsky::Parser;
 
     #[test]
     fn test_encoded_word() {
-        let parser = get_parser();
+        let parser = get_parser(Decoder::new());
         let message = "=?ISO-8859-1?Q?Yeet?=".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -175,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_clear_text() {
-        let parser = get_parser();
+        let parser = get_parser(Decoder::new());
         let message = "I use Arch by the way".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -192,7 +198,7 @@ mod tests {
     // https://datatracker.ietf.org/doc/html/rfc2047#section-8
     #[test]
     fn test_encoded_from_1() {
-        let parser = get_parser();
+        let parser = get_parser(Decoder::new());
         let message = "=?ISO-8859-1?Q?a?=".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -210,7 +216,7 @@ mod tests {
     // see test_encoded_from_1
     #[test]
     fn test_encoded_from_2() {
-        let parser = get_parser();
+        let parser = get_parser(Decoder::new());
         let message = "=?ISO-8859-1?Q?a?= b".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -231,7 +237,7 @@ mod tests {
     // see test_encoded_from_1
     #[test]
     fn test_encoded_from_3() {
-        let parser = get_parser();
+        let parser = get_parser(Decoder::new());
         let message = "=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -257,7 +263,7 @@ mod tests {
     /// See: https://datatracker.ietf.org/doc/html/rfc2047#section-8
     #[test]
     fn test_multiple_encoded_words() {
-        let parser = get_parser();
+        let parser = get_parser(Decoder::new());
         let message = "=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?= =?ISO-8859-1?Q?c?=".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -286,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_ignore_mutiple_spaces_between_encoded_words() {
-        let parser = get_parser();
+        let parser = get_parser(Decoder::new());
         let message =
             "=?ISO-8859-1?Q?a?=                               =?ISO-8859-1?Q?b?=".as_bytes();
 
@@ -312,7 +318,7 @@ mod tests {
     /// An encoded word with more then 75 chars should be parsed as a normal cleartext
     #[test]
     fn test_too_long_encoded_word() {
-        let parser = get_parser();
+        let parser = get_parser(Decoder::new());
         // "=?" (2) + "ISO-8859-1" (10) + "?" (1) + "Q" (1) + "?" (1) + 'a' (60) + "?=" (2)
         // = 2 + 10 + 1 + 1 + 1 + 60 + 2
         // = 77 => too long
@@ -326,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_encoded_word_has_especials() {
-        let parser = get_parser();
+        let parser = get_parser(Decoder::new());
         let message = "=?ISO-8859-1(?Q?a?=".as_bytes();
         let parsed = parser.parse(message).unwrap();
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* Added decoder builder [#17](https://github.com/soywod/rfc2047-decoder/pull/17)
+
 ## [0.1.3] - 2022-10-10
 
 ### Fixed

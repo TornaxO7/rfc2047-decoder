@@ -90,7 +90,7 @@ fn get_parser(decoder: Decoder) -> impl Parser<u8, Tokens, Error = Simple<u8>> {
     };
 
     let single_encoded_word = encoded_word_parser(&decoder);
-    let single_clear_text = clear_text_parser(decoder);
+    let single_clear_text = clear_text_parser(&decoder);
 
     encoded_words_in_a_row
         .or(single_encoded_word)
@@ -98,7 +98,7 @@ fn get_parser(decoder: Decoder) -> impl Parser<u8, Tokens, Error = Simple<u8>> {
         .repeated()
 }
 
-fn clear_text_parser(decoder: Decoder) -> impl Parser<u8, Token, Error = Simple<u8>> {
+fn clear_text_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simple<u8>> {
     use chumsky::prelude::*;
 
     const DEFAULT_EMPTY_INPUT_ERROR_MESSAGE: &str = "got empty input";

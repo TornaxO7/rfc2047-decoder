@@ -15,21 +15,30 @@ pub enum Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
+/// Represents the decoder builder.
+///
+/// ```
+/// let decoder = Decoder::new().skip_encoded_word_length(true);
+/// let decoded_str = decoder.decode("=?UTF-8?B?c3Ry?=");
+/// ```
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct Decoder {
     pub skip_encoded_word_length: bool,
 }
 
 impl Decoder {
+    /// Creates a new decoder builder using default values.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets option to skip encoded word length verification.
     pub fn skip_encoded_word_length(mut self, b: bool) -> Self {
         self.skip_encoded_word_length = b;
         self
     }
 
+    /// Decodes the given RFC 2047 MIME Message Header encoded string.
     pub fn decode<T: AsRef<[u8]>>(self, encoded_str: T) -> Result<String> {
         let text_tokens = lexer::run(encoded_str.as_ref(), self)?;
         let parsed_text = parser::run(text_tokens)?;

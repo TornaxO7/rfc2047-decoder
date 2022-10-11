@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Fixed
 
-* Added decoder builder [#17](https://github.com/soywod/rfc2047-decoder/pull/17)
+* Fixed decoding strings bigger than 76 chars [#15]
 
 ## [0.1.3] - 2022-10-10
 
@@ -56,3 +56,4 @@ First official release.
 [#2]: https://github.com/soywod/rfc2047-decoder/issues/2
 [#3]: https://github.com/soywod/rfc2047-decoder/issues/3
 [#7]: https://github.com/soywod/rfc2047-decoder/issues/7
+[#15]: https://github.com/soywod/rfc2047-decoder/issues/15

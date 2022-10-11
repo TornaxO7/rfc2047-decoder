@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+* Fixed discarded errors [#20].
+
 ## [0.2.0] - 2022-10-11
 
 ### Added
@@ -67,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 First official release.
 
-[unreleased]: https://github.com/soywod/rfc2047-decoder/compare/v0.1.3...HEAD
+[unreleased]: https://github.com/soywod/rfc2047-decoder/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/soywod/rfc2047-decoder/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/soywod/rfc2047-decoder/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/soywod/rfc2047-decoder/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/soywod/rfc2047-decoder/compare/v0.1.0...v0.1.1
@@ -78,3 +83,4 @@ First official release.
 [#3]: https://github.com/soywod/rfc2047-decoder/issues/3
 [#7]: https://github.com/soywod/rfc2047-decoder/issues/7
 [#15]: https://github.com/soywod/rfc2047-decoder/issues/15
+[#20]: https://github.com/soywod/rfc2047-decoder/issues/20

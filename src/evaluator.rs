@@ -71,9 +71,9 @@ fn decode_parsed_encoded_word(
 }
 
 pub fn run(parsed_encoded_words: ParsedEncodedWords) -> Result<String> {
-    let message = parsed_encoded_words
+    parsed_encoded_words
         .into_iter()
-        .flat_map(|parsed_encoded_word| match parsed_encoded_word {
+        .map(|parsed_encoded_word| match parsed_encoded_word {
             ParsedEncodedWord::ClearText(clear_text) => decode_utf8_string(clear_text),
             ParsedEncodedWord::EncodedWord {
                 charset,
@@ -81,7 +81,5 @@ pub fn run(parsed_encoded_words: ParsedEncodedWords) -> Result<String> {
                 encoded_text,
             } => decode_parsed_encoded_word(charset, encoding, encoded_text),
         })
-        .collect();
-
-    Ok(message)
+        .collect()
 }

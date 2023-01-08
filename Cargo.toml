@@ -1,7 +1,7 @@
 [package]
 name = "rfc2047-decoder"
 description = "Rust library for decoding RFC 2047 MIME Message Headers."
-version = "0.2.0" # do not forget html_root_url
+version = "0.2.1" # do not forget html_root_url
 authors = ["soywod <clement.douin@posteo.net>", "TornaxO7 <tornax07@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/soywod/rfc2047-decoder"

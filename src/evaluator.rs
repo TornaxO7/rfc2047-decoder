@@ -11,11 +11,11 @@ use crate::parser::{ClearText, Encoding, ParsedEncodedWord, ParsedEncodedWords};
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    DecodeUtf8Error(#[from] string::FromUtf8Error),
+    DecodeUtf8(#[from] string::FromUtf8Error),
     #[error(transparent)]
-    DecodeBase64Error(#[from] base64::DecodeError),
+    DecodeBase64(#[from] base64::DecodeError),
     #[error(transparent)]
-    DecodeQuotedPrintableError(#[from] quoted_printable::QuotedPrintableError),
+    DecodeQuotedPrintable(#[from] quoted_printable::QuotedPrintableError),
 }
 
 type Result<T> = result::Result<T, Error>;

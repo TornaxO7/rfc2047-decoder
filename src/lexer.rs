@@ -104,7 +104,7 @@ fn clear_text_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simple
 
     const DEFAULT_EMPTY_INPUT_ERROR_MESSAGE: &str = "got empty input";
 
-    take_until(encoded_word_parser(&decoder).rewind().ignored().or(end())).try_map(
+    take_until(encoded_word_parser(decoder).rewind().ignored().or(end())).try_map(
         |(chars, ()), span| {
             if chars.is_empty() {
                 Err(Simple::custom(span, DEFAULT_EMPTY_INPUT_ERROR_MESSAGE))

@@ -1,7 +1,4 @@
-use base64::{
-    alphabet,
-    engine::{GeneralPurpose, GeneralPurposeConfig}, Engine,
-};
+use base64::{CharacterSet, Config};
 use charset::Charset;
 use std::{result, string};
 use thiserror::Error;
@@ -21,13 +18,8 @@ pub enum Error {
 type Result<T> = result::Result<T, Error>;
 
 fn decode_base64(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
-    let base64_decoder = {
-        let config = GeneralPurposeConfig::new().with_decode_allow_trailing_bits(true);
-        GeneralPurpose::new(&alphabet::STANDARD, config)
-    };
-
-    let decoded_bytes = base64_decoder.decode(encoded_bytes)?;
-
+    let config = Config::new(CharacterSet::Standard, true).decode_allow_trailing_bits(true);
+    let decoded_bytes = base64::decode_config(&encoded_bytes, config)?;
     Ok(decoded_bytes)
 }
 

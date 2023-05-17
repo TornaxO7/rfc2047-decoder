@@ -13,6 +13,18 @@ pub enum Error {
     Evaluator(#[from] evaluator::Error),
 }
 
+/// Determines which strategy should be used if an encoded word isn't encoded as
+/// described in the RFC.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum RecoverStrategy {
+    /// Decode the encoded word although it's incorrectly encoded.
+    Decode,
+    /// Skip the incorrectly encoded encoded word.
+    Skip,
+    /// Abort the string-parsing and return an error.
+    Abort,
+}
+
 pub type Result<T> = result::Result<T, Error>;
 
 /// Represents the decoder builder.

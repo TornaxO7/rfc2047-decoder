@@ -33,9 +33,9 @@ pub type Result<T> = result::Result<T, Error>;
 /// let decoder = rfc2047_decoder::Decoder::new().skip_encoded_word_length(true);
 /// let decoded_str = decoder.decode("=?UTF-8?B?c3Ry?=");
 /// ```
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Decoder {
-    pub skip_encoded_word_length: bool,
+    pub too_long_encoded_word: RecoverStrategy,
 }
 
 impl Decoder {
@@ -44,9 +44,9 @@ impl Decoder {
         Self::default()
     }
 
-    /// Sets option to skip encoded word length verification.
-    pub fn skip_encoded_word_length(mut self, b: bool) -> Self {
-        self.skip_encoded_word_length = b;
+    /// Set the strategy if the decoder finds an encoded word which is too long.
+    pub fn too_long_encoded_word_strategy(mut self, strategy: RecoverStrategy) -> Self {
+        self.too_long_encoded_word = strategy;
         self
     }
 
@@ -57,6 +57,14 @@ impl Decoder {
         let evaluated_string = evaluator::run(parsed_text)?;
 
         Ok(evaluated_string)
+    }
+}
+
+impl Default for Decoder {
+    fn default() -> Self {
+        Self {
+            too_long_encoded_word: RecoverStrategy::Abort,
+        }
     }
 }
 

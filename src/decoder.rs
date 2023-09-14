@@ -129,7 +129,7 @@ mod tests {
 
     /// Those are some custom tests
     mod custom_tests {
-        use crate::{decode, Decoder};
+        use crate::{decode, decoder::RecoverStrategy, Decoder};
 
         #[test]
         fn clear_empty() {
@@ -218,7 +218,7 @@ mod tests {
         #[test]
         fn utf8_b64_skip_encoded_word_length() {
             assert_eq!(
-                Decoder::new().skip_encoded_word_length(true).decode("=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=").unwrap(),
+                Decoder::new().too_long_encoded_word_strategy(RecoverStrategy::Skip).decode("=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=").unwrap(),
                 "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut interdum quam eu facilisis ornare.",
             );
         }

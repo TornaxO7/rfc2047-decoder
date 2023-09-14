@@ -2,8 +2,8 @@ use std::fmt::Display;
 
 use super::QUESTION_MARK;
 
-pub const PREFIX: &'static [u8] = "=?".as_bytes();
-pub const SUFFIX: &'static [u8] = "?=".as_bytes();
+pub const PREFIX: &[u8] = "=?".as_bytes();
+pub const SUFFIX: &[u8] = "?=".as_bytes();
 pub const MAX_LENGTH: usize = 75;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

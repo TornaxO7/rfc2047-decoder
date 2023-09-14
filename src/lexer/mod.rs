@@ -70,7 +70,7 @@ impl Token {
 pub fn run(encoded_bytes: &[u8], decoder: Decoder) -> Result<Tokens> {
     let tokens = get_parser(&decoder)
         .parse(encoded_bytes)
-        .map_err(|err| LexerError::ParseBytesError(err))?;
+        .map_err(LexerError::ParseBytesError)?;
 
     validate_tokens(tokens, &decoder)
 }
@@ -80,12 +80,12 @@ fn get_parser(decoder: &Decoder) -> impl Parser<u8, Tokens, Error = Simple<u8>> 
 
     let encoded_words_in_a_row = {
         let following_encoded_word =
-            whitespace().ignore_then(encoded_word_parser(&decoder).rewind());
-        encoded_word_parser(&decoder).then_ignore(following_encoded_word)
+            whitespace().ignore_then(encoded_word_parser(decoder).rewind());
+        encoded_word_parser(decoder).then_ignore(following_encoded_word)
     };
 
-    let single_encoded_word = encoded_word_parser(&decoder);
-    let single_clear_text = clear_text_parser(&decoder);
+    let single_encoded_word = encoded_word_parser(decoder);
+    let single_clear_text = clear_text_parser(decoder);
 
     encoded_words_in_a_row
         .or(single_encoded_word)
@@ -98,7 +98,7 @@ fn clear_text_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simple
 
     const DEFAULT_EMPTY_INPUT_ERROR_MESSAGE: &str = "got empty input";
 
-    take_until(encoded_word_parser(&decoder).rewind().ignored().or(end())).try_map(
+    take_until(encoded_word_parser(decoder).rewind().ignored().or(end())).try_map(
         |(chars, ()), span| {
             if chars.is_empty() {
                 Err(Simple::custom(span, DEFAULT_EMPTY_INPUT_ERROR_MESSAGE))
@@ -160,7 +160,7 @@ fn get_too_long_encoded_words(tokens: &Tokens, decoder: &Decoder) -> Option<TooL
     let strategy = decoder.too_long_encoded_word;
     let mut too_long_encoded_words: Vec<String> = Vec::new();
 
-    for token in tokens.into_iter() {
+    for token in tokens.iter() {
         if let Token::EncodedWord(encoded_word) = token {
             if token.len() > encoded_word::MAX_LENGTH && strategy == RecoverStrategy::Abort {
                 too_long_encoded_words.push(encoded_word.to_string());

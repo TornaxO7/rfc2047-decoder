@@ -20,7 +20,7 @@ type Result<T> = result::Result<T, EvaluatorError>;
 
 fn decode_base64(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
     let config = Config::new(CharacterSet::Standard, true).decode_allow_trailing_bits(true);
-    let decoded_bytes = base64::decode_config(&encoded_bytes, config)?;
+    let decoded_bytes = base64::decode_config(encoded_bytes, config)?;
     Ok(decoded_bytes)
 }
 

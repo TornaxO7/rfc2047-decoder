@@ -5,6 +5,7 @@ use thiserror::Error;
 
 use crate::parser::{ClearText, Encoding, ParsedEncodedWord, ParsedEncodedWords};
 
+/// All errors which the evaluator can throw.
 #[derive(Error, Debug, PartialEq)]
 pub enum EvaluatorError {
     #[error(transparent)]

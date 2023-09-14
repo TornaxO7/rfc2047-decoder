@@ -3,6 +3,7 @@ use std::{convert::TryFrom, result};
 
 use crate::lexer::{Token, Tokens, encoded_word};
 
+/// All errors which the parser can throw.
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]
 pub enum ParserError {
     #[error("cannot parse encoding: encoding is bigger than a char")]

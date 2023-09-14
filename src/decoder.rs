@@ -15,7 +15,7 @@ pub enum Error {
 
 /// Determines which strategy should be used if an encoded word isn't encoded as
 /// described in the RFC.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RecoverStrategy {
     /// Decode the encoded word although it's incorrectly encoded.
     Decode,

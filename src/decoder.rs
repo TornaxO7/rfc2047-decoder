@@ -3,14 +3,20 @@ use thiserror::Error;
 
 use crate::{evaluator, lexer, parser};
 
-#[derive(Error, Debug)]
+/// The possible errors which can occur while parsing the string.
+#[derive(Error, Debug, PartialEq)]
 pub enum Error {
+    /// Symbolises that an error occured in the lexer.
     #[error(transparent)]
-    Lexer(#[from] lexer::Error),
+    Lexer(#[from] lexer::LexerError),
+
+    /// Symbolises that an error occured in the parser.
     #[error(transparent)]
-    Parser(#[from] parser::Error),
+    Parser(#[from] parser::ParserError),
+
+    /// Symbolises that an error occured in the evaluator.
     #[error(transparent)]
-    Evaluator(#[from] evaluator::Error),
+    Evaluator(#[from] evaluator::EvaluatorError),
 }
 
 /// Determines which strategy should be used if an encoded word isn't encoded as
@@ -25,10 +31,11 @@ pub enum RecoverStrategy {
     Abort,
 }
 
-pub type Result<T> = result::Result<T, Error>;
+type Result<T> = result::Result<T, Error>;
 
 /// Represents the decoder builder.
 ///
+/// # Example
 /// ```
 /// use rfc2047_decoder::{Decoder, RecoverStrategy};
 ///
@@ -38,16 +45,78 @@ pub type Result<T> = result::Result<T, Error>;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Decoder {
+    /// Detemrines which strategy should be used, if the parser encounters
+    /// encoded words which are too longer than allowed in the RFC.
     pub too_long_encoded_word: RecoverStrategy,
 }
 
 impl Decoder {
-    /// Creates a new decoder builder using default values.
+    /// Equals [Decoder::default].
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Set the strategy if the decoder finds an encoded word which is too long.
+    ///
+    /// # Examples
+    ///
+    /// Each example uses the same encoded message:
+    /// ```txt
+    /// =?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=
+    /// ```
+    /// which exceeds the maximum length of 75 chars so it's actually invalid.
+    ///
+    /// ## RecoverStrategy::Skip
+    /// Skips the invalid encoded word and parses it as clear text.
+    ///
+    /// ```rust
+    /// use rfc2047_decoder::{Decoder, RecoverStrategy};
+    ///
+    /// let message = "=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=";
+    /// let decoder = Decoder::new()
+    ///                 .too_long_encoded_word_strategy(RecoverStrategy::Skip);
+    ///
+    /// let parsed = decoder.decode(message).unwrap();
+    ///
+    /// // nothing changed!
+    /// assert_eq!(parsed, message);
+    /// ```
+    ///
+    /// ## RecoverStrategy::Decode
+    /// Although the encoded word is invalid, keep decoding it.
+    ///
+    /// ```rust
+    /// use rfc2047_decoder::{Decoder, RecoverStrategy};
+    ///
+    /// let message = "=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=";
+    /// let decoder = Decoder::new()
+    ///                 .too_long_encoded_word_strategy(RecoverStrategy::Decode);
+    ///
+    /// let parsed = decoder.decode(message).unwrap();
+    ///
+    /// // could you decode it? ;)
+    /// let expected_result = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut interdum quam eu facilisis ornare.";
+    ///
+    /// assert_eq!(parsed, expected_result);
+    /// ```
+    ///
+    /// ## RecoverStrategy::Abort (default)
+    /// The parser will return an `Err` and collects all encoded words which are
+    /// too long. You can use them afterwards for error messages for example.
+    ///
+    /// ```rust
+    /// use rfc2047_decoder::{Decoder, RecoverStrategy, Error::{self, Lexer}};
+    /// use rfc2047_decoder::LexerError::ParseEncodedWordTooLongError;
+    /// use rfc2047_decoder::TooLongEncodedWords;
+    ///
+    /// let message = "=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=";
+    /// // `RecoverStrategy::Abort` is the default strategy
+    /// let decoder = Decoder::new();
+    ///
+    /// let parsed = decoder.decode(message);
+    ///
+    /// assert_eq!(parsed, Err(Lexer(ParseEncodedWordTooLongError(TooLongEncodedWords(vec!["=?utf-8?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?B?=".to_string()])))));
+    /// ```
     pub fn too_long_encoded_word_strategy(mut self, strategy: RecoverStrategy) -> Self {
         self.too_long_encoded_word = strategy;
         self
@@ -64,6 +133,9 @@ impl Decoder {
 }
 
 impl Default for Decoder {
+    /// Returns the decoder with the following default "settings":
+    ///
+    /// - `too_long_encoded_word`: [RecoverStrategy::Abort]
     fn default() -> Self {
         Self {
             too_long_encoded_word: RecoverStrategy::Abort,

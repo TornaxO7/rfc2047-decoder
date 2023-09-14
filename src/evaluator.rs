@@ -5,8 +5,8 @@ use thiserror::Error;
 
 use crate::parser::{ClearText, Encoding, ParsedEncodedWord, ParsedEncodedWords};
 
-#[derive(Error, Debug)]
-pub enum Error {
+#[derive(Error, Debug, PartialEq)]
+pub enum EvaluatorError {
     #[error(transparent)]
     DecodeUtf8Error(#[from] string::FromUtf8Error),
     #[error(transparent)]
@@ -15,7 +15,7 @@ pub enum Error {
     DecodeQuotedPrintableError(#[from] quoted_printable::QuotedPrintableError),
 }
 
-type Result<T> = result::Result<T, Error>;
+type Result<T> = result::Result<T, EvaluatorError>;
 
 fn decode_base64(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
     let config = Config::new(CharacterSet::Standard, true).decode_allow_trailing_bits(true);

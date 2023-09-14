@@ -11,9 +11,10 @@ use self::encoded_word::EncodedWord;
 pub const QUESTION_MARK: u8 = b'?';
 const SPACE: u8 = b' ';
 
-/// A little helper struct to make `Vec<String>` displayable
+/// A helper struct which implements [std::fmt::Display] for `Vec<String>` and
+/// which contains the encoded words which are too long as a `String`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TooLongEncodedWords(Vec<String>);
+pub struct TooLongEncodedWords(pub Vec<String>);
 
 impl TooLongEncodedWords {
     pub fn new(encoded_words: Vec<String>) -> Self {
@@ -37,15 +38,16 @@ impl Display for TooLongEncodedWords {
     }
 }
 
+/// All errors which the lexer can throw.
 #[derive(Error, Debug, Clone, PartialEq)]
-pub enum Error {
+pub enum LexerError {
     #[error("cannot parse bytes into tokens")]
     ParseBytesError(Vec<Simple<u8>>),
     #[error("Cannot parse the following encoded words, because they are too long: {0}")]
     ParseEncodedWordTooLongError(TooLongEncodedWords),
 }
 
-type Result<T> = result::Result<T, Error>;
+type Result<T> = result::Result<T, LexerError>;
 
 pub type Tokens = Vec<Token>;
 
@@ -68,7 +70,7 @@ impl Token {
 pub fn run(encoded_bytes: &[u8], decoder: Decoder) -> Result<Tokens> {
     let tokens = get_parser(&decoder)
         .parse(encoded_bytes)
-        .map_err(|err| Error::ParseBytesError(err))?;
+        .map_err(|err| LexerError::ParseBytesError(err))?;
 
     validate_tokens(tokens, &decoder)
 }
@@ -148,7 +150,7 @@ fn get_especials() -> HashSet<u8> {
 
 fn validate_tokens(tokens: Tokens, decoder: &Decoder) -> Result<Tokens> {
     if let Some(too_long_encoded_words) = get_too_long_encoded_words(&tokens, decoder) {
-        return Err(Error::ParseEncodedWordTooLongError(too_long_encoded_words));
+        return Err(LexerError::ParseEncodedWordTooLongError(too_long_encoded_words));
     }
 
     Ok(tokens)
@@ -180,7 +182,7 @@ mod tests {
         Decoder,
     };
 
-    use super::{get_parser, Error, TooLongEncodedWords};
+    use super::{get_parser, LexerError, TooLongEncodedWords};
     use chumsky::Parser;
 
     #[test]
@@ -349,7 +351,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            Err(Error::ParseEncodedWordTooLongError(
+            Err(LexerError::ParseEncodedWordTooLongError(
                 TooLongEncodedWords::new(vec![EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),

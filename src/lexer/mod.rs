@@ -1,9 +1,17 @@
+pub mod encoded_word;
+
 use chumsky::{prelude::Simple, text::whitespace, Parser};
-use std::{collections::HashSet, result, fmt::Display};
+use std::{collections::HashSet, fmt::Display, result};
 use thiserror::Error;
 
 use crate::{decoder::RecoverStrategy, Decoder};
 
+use self::encoded_word::EncodedWord;
+
+pub const QUESTION_MARK: u8 = b'?';
+const SPACE: u8 = b' ';
+
+/// A little helper struct to make `Vec<String>` displayable
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TooLongEncodedWords(Vec<String>);
 
@@ -39,70 +47,20 @@ pub enum Error {
 
 type Result<T> = result::Result<T, Error>;
 
-const QUESTION_MARK: u8 = b'?';
-const SPACE: u8 = b' ';
-const AMOUNT_DELIMITERS: usize = "=????=".len();
-
 pub type Tokens = Vec<Token>;
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum Token {
     ClearText(Vec<u8>),
-    EncodedWord {
-        charset: Vec<u8>,
-        encoding: Vec<u8>,
-        encoded_text: Vec<u8>,
-    },
+    EncodedWord(EncodedWord),
 }
 
 impl Token {
-    pub const ENCODED_WORD_PREFIX: &'static [u8] = "=?".as_bytes();
-    pub const ENCODED_WORD_SUFFIX: &'static [u8] = "?=".as_bytes();
-    pub const MAX_ENCODED_WORD_LENGTH: usize = 75;
-
-    /// Returns the length of the encoded word including the delimiters
+    /// Returns the amount of bytes which the token holds
     pub fn len(&self) -> usize {
         match self {
-            Self::ClearText(_) => 1,
-            Self::EncodedWord {
-                charset,
-                encoding,
-                encoded_text,
-            } => charset.len() + encoding.len() + encoded_text.len() + AMOUNT_DELIMITERS,
-        }
-    }
-
-    pub fn is_encoded_word(&self) -> bool {
-        match self {
-            Self::EncodedWord {..} => true,
-            _ => false,
-        }
-    }
-
-    pub fn get_bytes(&self) -> Vec<u8> {
-        match self {
-            Token::ClearText(token) => (*token).clone(),
-            Token::EncodedWord {
-                charset,
-                encoding,
-                encoded_text,
-            } => {
-                let mut bytes = Vec::new();
-                bytes.extend(charset);
-                bytes.extend(encoding);
-                bytes.extend(encoded_text);
-                bytes
-            }
-        }
-    }
-
-    pub fn get_encoded_word(
-        ((charset, encoding), encoded_text): ((Vec<u8>, Vec<u8>), Vec<u8>),
-    ) -> Self {
-        Self::EncodedWord {
-            charset,
-            encoding,
-            encoded_text,
+            Self::ClearText(clear_text) => clear_text.len(),
+            Self::EncodedWord(encoded_word) => encoded_word.len(),
         }
     }
 }
@@ -154,15 +112,13 @@ fn encoded_word_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simp
 
     let skip_encoded_word_length = decoder.too_long_encoded_word;
 
-    let check_encoded_word_length = move |token: Token, _span| {
-        if token.len() > Token::MAX_ENCODED_WORD_LENGTH {
-            match skip_encoded_word_length {
-                RecoverStrategy::Skip => Ok(Token::ClearText(token.get_bytes())),
-                // Hint: The lexer 
-                RecoverStrategy::Decode | RecoverStrategy::Abort => Ok(token),
-            }
+    let convert_to_token = move |encoded_word: EncodedWord| {
+        if encoded_word.len() > encoded_word::MAX_LENGTH
+            && skip_encoded_word_length == RecoverStrategy::Skip
+        {
+            Token::ClearText(encoded_word.get_bytes(true))
         } else {
-            Ok(token)
+            Token::EncodedWord(encoded_word)
         }
     };
 
@@ -175,15 +131,15 @@ fn encoded_word_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simp
         .repeated()
         .collect::<Vec<u8>>();
 
-    just(Token::ENCODED_WORD_PREFIX)
+    just(encoded_word::PREFIX)
         .ignore_then(charset)
         .then_ignore(just(QUESTION_MARK))
         .then(encoding)
         .then_ignore(just(QUESTION_MARK))
         .then(encoded_text)
-        .then_ignore(just(Token::ENCODED_WORD_SUFFIX))
-        .map(Token::get_encoded_word)
-        .try_map(check_encoded_word_length)
+        .then_ignore(just(encoded_word::SUFFIX))
+        .map(EncodedWord::from_parser)
+        .map(convert_to_token)
 }
 
 fn get_especials() -> HashSet<u8> {
@@ -203,9 +159,10 @@ fn get_too_long_encoded_words(tokens: &Tokens, decoder: &Decoder) -> Option<TooL
     let mut too_long_encoded_words: Vec<String> = Vec::new();
 
     for token in tokens.into_iter() {
-        if token.is_encoded_word() && token.len() > Token::MAX_ENCODED_WORD_LENGTH && strategy == RecoverStrategy::Abort {
-            let encoded_word = String::from_utf8(token.get_bytes()).unwrap();
-            too_long_encoded_words.push(encoded_word);
+        if let Token::EncodedWord(encoded_word) = token {
+            if token.len() > encoded_word::MAX_LENGTH && strategy == RecoverStrategy::Abort {
+                too_long_encoded_words.push(encoded_word.to_string());
+            }
         }
     }
 
@@ -218,7 +175,10 @@ fn get_too_long_encoded_words(tokens: &Tokens, decoder: &Decoder) -> Option<TooL
 
 #[cfg(test)]
 mod tests {
-    use crate::{lexer::Token, Decoder};
+    use crate::{
+        lexer::{encoded_word::EncodedWord, Token},
+        Decoder,
+    };
 
     use super::get_parser;
     use chumsky::Parser;
@@ -232,11 +192,11 @@ mod tests {
 
         assert_eq!(
             parsed,
-            vec![Token::EncodedWord {
+            vec![Token::EncodedWord(EncodedWord {
                 charset: "ISO-8859-1".as_bytes().to_vec(),
                 encoding: "Q".as_bytes().to_vec(),
                 encoded_text: "Yeet".as_bytes().to_vec(),
-            }]
+            })]
         );
     }
 
@@ -266,11 +226,11 @@ mod tests {
 
         assert_eq!(
             parsed,
-            vec![Token::EncodedWord {
+            vec![Token::EncodedWord(EncodedWord {
                 charset: "ISO-8859-1".as_bytes().to_vec(),
                 encoding: "Q".as_bytes().to_vec(),
                 encoded_text: "a".as_bytes().to_vec()
-            }]
+            })]
         );
     }
 
@@ -285,11 +245,11 @@ mod tests {
         assert_eq!(
             parsed,
             vec![
-                Token::EncodedWord {
+                Token::EncodedWord(EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "a".as_bytes().to_vec(),
-                },
+                }),
                 Token::ClearText(" b".as_bytes().to_vec()),
             ]
         );
@@ -306,16 +266,16 @@ mod tests {
         assert_eq!(
             parsed,
             vec![
-                Token::EncodedWord {
+                Token::EncodedWord(EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "a".as_bytes().to_vec(),
-                },
-                Token::EncodedWord {
+                }),
+                Token::EncodedWord(EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "b".as_bytes().to_vec()
-                }
+                })
             ]
         );
     }
@@ -332,21 +292,21 @@ mod tests {
         assert_eq!(
             parsed,
             vec![
-                Token::EncodedWord {
+                Token::EncodedWord(EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "a".as_bytes().to_vec(),
-                },
-                Token::EncodedWord {
+                }),
+                Token::EncodedWord(EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "b".as_bytes().to_vec()
-                },
-                Token::EncodedWord {
+                }),
+                Token::EncodedWord(EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "c".as_bytes().to_vec()
-                }
+                })
             ]
         );
     }
@@ -362,16 +322,16 @@ mod tests {
         assert_eq!(
             parsed,
             vec![
-                Token::EncodedWord {
+                Token::EncodedWord(EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "a".as_bytes().to_vec(),
-                },
-                Token::EncodedWord {
+                }),
+                Token::EncodedWord(EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),
                     encoded_text: "b".as_bytes().to_vec()
-                }
+                })
             ]
         );
     }

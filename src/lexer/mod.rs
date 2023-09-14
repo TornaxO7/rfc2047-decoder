@@ -186,7 +186,7 @@ mod tests {
     use chumsky::Parser;
 
     #[test]
-    fn test_encoded_word() {
+    fn encoded_word() {
         let parser = get_parser(&Decoder::new());
         let message = "=?ISO-8859-1?Q?Yeet?=".as_bytes();
 
@@ -203,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    fn test_clear_text() {
+    fn clear_text() {
         let parser = get_parser(&Decoder::new());
         let message = "I use Arch by the way".as_bytes();
 
@@ -220,7 +220,7 @@ mod tests {
     // The following examples are from the encoded-form table in section 8:
     // https://datatracker.ietf.org/doc/html/rfc2047#section-8
     #[test]
-    fn test_encoded_from_1() {
+    fn encoded_from_1() {
         let parser = get_parser(&Decoder::new());
         let message = "=?ISO-8859-1?Q?a?=".as_bytes();
 
@@ -236,9 +236,9 @@ mod tests {
         );
     }
 
-    // see test_encoded_from_1
+    // see encoded_from_1
     #[test]
-    fn test_encoded_from_2() {
+    fn encoded_from_2() {
         let parser = get_parser(&Decoder::new());
         let message = "=?ISO-8859-1?Q?a?= b".as_bytes();
 
@@ -257,9 +257,9 @@ mod tests {
         );
     }
 
-    // see test_encoded_from_1
+    // see encoded_from_1
     #[test]
-    fn test_encoded_from_3() {
+    fn encoded_from_3() {
         let parser = get_parser(&Decoder::new());
         let message = "=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=".as_bytes();
 
@@ -285,7 +285,7 @@ mod tests {
     /// Test if parser can parse multiple encoded words in a row
     /// See: https://datatracker.ietf.org/doc/html/rfc2047#section-8
     #[test]
-    fn test_multiple_encoded_words() {
+    fn multiple_encoded_words() {
         let parser = get_parser(&Decoder::new());
         let message = "=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?= =?ISO-8859-1?Q?c?=".as_bytes();
 
@@ -314,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ignore_mutiple_spaces_between_encoded_words() {
+    fn ignore_mutiple_spaces_between_encoded_words() {
         let parser = get_parser(&Decoder::new());
         let message =
             "=?ISO-8859-1?Q?a?=                               =?ISO-8859-1?Q?b?=".as_bytes();
@@ -365,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encoded_word_has_especials() {
+    fn encoded_word_has_especials() {
         let parser = get_parser(&Decoder::new());
         let message = "=?ISO-8859-1(?Q?a?=".as_bytes();
         let parsed = parser.parse(message).unwrap();

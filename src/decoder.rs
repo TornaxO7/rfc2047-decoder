@@ -24,10 +24,21 @@ pub enum Error {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RecoverStrategy {
     /// Decode the encoded word although it's incorrectly encoded.
+    ///
+    /// # Example
+    /// Take a look to [Decoder#RecoveryStrategy::Decode](Decoder#recoverstrategydecode).
     Decode,
+
     /// Skip the incorrectly encoded encoded word.
+    ///
+    /// # Example
+    /// Take a look to [Decoder#RecoveryStrategy::Skip](Decoder#recoverstrategyskip).
     Skip,
+
     /// Abort the string-parsing and return an error.
+    ///
+    /// # Example
+    /// Take a look to [Decoder#RecoveryStrategy::Abort](Decoder#recoverstrategyabort-default).
     Abort,
 }
 
@@ -151,17 +162,17 @@ mod tests {
         use crate::decode;
 
         #[test]
-        fn test_example_1() {
+        fn example_1() {
             assert_eq!(decode("=?ISO-8859-1?Q?a?=").unwrap(), "a");
         }
 
         #[test]
-        fn test_example_2() {
+        fn example_2() {
             assert_eq!(decode("=?ISO-8859-1?Q?a?= b").unwrap(), "a b");
         }
 
         #[test]
-        fn test_example_3() {
+        fn example_3() {
             assert_eq!(
                 decode("=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=").unwrap(),
                 "ab"
@@ -169,7 +180,7 @@ mod tests {
         }
 
         #[test]
-        fn test_example_4() {
+        fn example_4() {
             assert_eq!(
                 decode("=?ISO-8859-1?Q?a?=  =?ISO-8859-1?Q?b?=").unwrap(),
                 "ab"
@@ -177,7 +188,7 @@ mod tests {
         }
 
         #[test]
-        fn test_example_5() {
+        fn example_5() {
             assert_eq!(
                 decode(
                     "=?ISO-8859-1?Q?a?=               
@@ -189,12 +200,12 @@ mod tests {
         }
 
         #[test]
-        fn test_example_6() {
+        fn example_6() {
             assert_eq!(decode("=?ISO-8859-1?Q?a_b?=").unwrap(), "a b");
         }
 
         #[test]
-        fn test_example_7() {
+        fn example_7() {
             assert_eq!(
                 decode("=?ISO-8859-1?Q?a?= =?ISO-8859-2?Q?_b?=").unwrap(),
                 "a b"
@@ -204,7 +215,7 @@ mod tests {
 
     /// Those are some custom tests
     mod custom_tests {
-        use crate::{decode, decoder::RecoverStrategy, Decoder};
+        use crate::decode;
 
         #[test]
         fn clear_empty() {
@@ -287,14 +298,6 @@ mod tests {
             assert_eq!(
                 decode("=?utf-8?B?UG9ydGFsZSBIYWNraW5nVGVhbW==?=").unwrap(),
                 "Portale HackingTeam",
-            );
-        }
-
-        #[test]
-        fn utf8_b64_skip_encoded_word_length() {
-            assert_eq!(
-                Decoder::new().too_long_encoded_word_strategy(RecoverStrategy::Skip).decode("=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=").unwrap(),
-                "=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=",
             );
         }
     }

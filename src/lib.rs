@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.2.1")]
+#![doc(html_root_url = "https://docs.rs/rfc2047-decoder/0.2.2")]
 
 mod decoder;
 pub use decoder::{Decoder, RecoverStrategy, Error};

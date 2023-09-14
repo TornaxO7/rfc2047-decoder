@@ -176,11 +176,11 @@ fn get_too_long_encoded_words(tokens: &Tokens, decoder: &Decoder) -> Option<TooL
 #[cfg(test)]
 mod tests {
     use crate::{
-        lexer::{encoded_word::EncodedWord, Token},
+        lexer::{encoded_word::EncodedWord, Token, run},
         Decoder,
     };
 
-    use super::get_parser;
+    use super::{get_parser, Error, TooLongEncodedWords};
     use chumsky::Parser;
 
     #[test]
@@ -336,19 +336,30 @@ mod tests {
         );
     }
 
-    /// An encoded word with more then 75 chars should be parsed as a normal cleartext
+    /// An encoded word with more then 75 chars should panic
     #[test]
-    fn test_too_long_encoded_word() {
-        let parser = get_parser(&Decoder::new());
+    fn err_on_too_long_encoded_word() {
         // "=?" (2) + "ISO-8859-1" (10) + "?" (1) + "Q" (1) + "?" (1) + 'a' (60) + "?=" (2)
         // = 2 + 10 + 1 + 1 + 1 + 60 + 2
         // = 77 => too long
         let message =
             "=?ISO-8859-1?Q?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?="
                 .as_bytes();
-        let parsed = parser.parse(message).unwrap();
+        let parsed = run(message, Decoder::new());
 
-        assert_eq!(parsed, vec![Token::ClearText(message.to_vec())]);
+        assert_eq!(
+            parsed,
+            Err(Error::ParseEncodedWordTooLongError(
+                TooLongEncodedWords::new(vec![EncodedWord {
+                    charset: "ISO-8859-1".as_bytes().to_vec(),
+                    encoding: "Q".as_bytes().to_vec(),
+                    encoded_text: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        .as_bytes()
+                        .to_vec()
+                }
+                .to_string()])
+            ))
+        );
     }
 
     #[test]

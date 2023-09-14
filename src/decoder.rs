@@ -30,7 +30,10 @@ pub type Result<T> = result::Result<T, Error>;
 /// Represents the decoder builder.
 ///
 /// ```
-/// let decoder = rfc2047_decoder::Decoder::new().skip_encoded_word_length(true);
+/// use rfc2047_decoder::{Decoder, RecoverStrategy};
+///
+/// let decoder = Decoder::new()
+///                 .too_long_encoded_word_strategy(RecoverStrategy::Skip);
 /// let decoded_str = decoder.decode("=?UTF-8?B?c3Ry?=");
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -219,7 +222,7 @@ mod tests {
         fn utf8_b64_skip_encoded_word_length() {
             assert_eq!(
                 Decoder::new().too_long_encoded_word_strategy(RecoverStrategy::Skip).decode("=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=").unwrap(),
-                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut interdum quam eu facilisis ornare.",
+                "=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=",
             );
         }
     }

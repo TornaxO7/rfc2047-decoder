@@ -10,7 +10,7 @@ use crate::parser::{ClearText, Encoding, ParsedEncodedWord, ParsedEncodedWords};
 
 /// All errors which the evaluator can throw.
 #[derive(Error, Debug, PartialEq)]
-pub enum EvaluatorError {
+pub enum Error {
     #[error(transparent)]
     DecodeUtf8Error(#[from] string::FromUtf8Error),
     #[error(transparent)]
@@ -19,7 +19,7 @@ pub enum EvaluatorError {
     DecodeQuotedPrintableError(#[from] quoted_printable::QuotedPrintableError),
 }
 
-type Result<T> = result::Result<T, EvaluatorError>;
+type Result<T> = result::Result<T, Error>;
 
 fn decode_base64(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
     let base64_decoder = {

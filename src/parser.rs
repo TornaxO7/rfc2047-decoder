@@ -5,7 +5,7 @@ use crate::lexer::{Token, Tokens, encoded_word};
 
 /// All errors which the parser can throw.
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]
-pub enum ParserError {
+pub enum Error {
     #[error("cannot parse encoding: encoding is bigger than a char")]
     ParseEncodingTooBigError,
     #[error("cannot parse encoding: encoding is empty")]
@@ -14,7 +14,7 @@ pub enum ParserError {
     ParseEncodingError(char),
 }
 
-type Result<T> = result::Result<T, ParserError>;
+type Result<T> = result::Result<T, Error>;
 
 pub type ClearText = Vec<u8>;
 pub type ParsedEncodedWords = Vec<ParsedEncodedWord>;
@@ -32,20 +32,20 @@ impl Encoding {
 }
 
 impl TryFrom<Vec<u8>> for Encoding {
-    type Error = ParserError;
+    type Error = Error;
 
     fn try_from(token: Vec<u8>) -> Result<Self> {
         if token.len() > Self::MAX_LENGTH {
-            return Err(ParserError::ParseEncodingTooBigError);
+            return Err(Error::ParseEncodingTooBigError);
         }
 
-        let encoding = token.first().ok_or(ParserError::ParseEncodingEmptyError)?;
+        let encoding = token.first().ok_or(Error::ParseEncodingEmptyError)?;
         let encoding = *encoding as char;
 
         match encoding.to_ascii_lowercase() {
             Encoding::Q_CHAR => Ok(Self::Q),
             Encoding::B_CHAR => Ok(Self::B),
-            _ => Err(ParserError::ParseEncodingError(encoding)),
+            _ => Err(Error::ParseEncodingError(encoding)),
         }
     }
 }

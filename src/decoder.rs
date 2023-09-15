@@ -8,15 +8,15 @@ use crate::{evaluator, lexer, parser};
 pub enum Error {
     /// Symbolises that an error occured in the lexer.
     #[error(transparent)]
-    Lexer(#[from] lexer::LexerError),
+    Lexer(#[from] lexer::Error),
 
     /// Symbolises that an error occured in the parser.
     #[error(transparent)]
-    Parser(#[from] parser::ParserError),
+    Parser(#[from] parser::Error),
 
     /// Symbolises that an error occured in the evaluator.
     #[error(transparent)]
-    Evaluator(#[from] evaluator::EvaluatorError),
+    Evaluator(#[from] evaluator::Error),
 }
 
 /// Determines which strategy should be used if an encoded word isn't encoded as

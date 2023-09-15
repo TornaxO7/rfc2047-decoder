@@ -7,9 +7,9 @@ mod evaluator;
 mod lexer;
 mod parser;
 
-pub use lexer::{TooLongEncodedWords, LexerError};
-pub use parser::ParserError;
-pub use evaluator::EvaluatorError;
+pub use lexer::{TooLongEncodedWords, Error as LexerError};
+pub use parser::Error as ParserError;
+pub use evaluator::Error as EvaluatorError;
 
 /// Decodes the given RFC 2047 MIME Message Header encoded string
 /// using a default decoder.

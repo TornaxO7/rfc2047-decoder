@@ -40,14 +40,14 @@ impl Display for TooLongEncodedWords {
 
 /// All errors which the lexer can throw.
 #[derive(Error, Debug, Clone, PartialEq)]
-pub enum LexerError {
+pub enum Error {
     #[error("cannot parse bytes into tokens")]
     ParseBytesError(Vec<Simple<u8>>),
     #[error("Cannot parse the following encoded words, because they are too long: {0}")]
     ParseEncodedWordTooLongError(TooLongEncodedWords),
 }
 
-type Result<T> = result::Result<T, LexerError>;
+type Result<T> = result::Result<T, Error>;
 
 pub type Tokens = Vec<Token>;
 
@@ -70,7 +70,7 @@ impl Token {
 pub fn run(encoded_bytes: &[u8], decoder: Decoder) -> Result<Tokens> {
     let tokens = get_parser(&decoder)
         .parse(encoded_bytes)
-        .map_err(LexerError::ParseBytesError)?;
+        .map_err(Error::ParseBytesError)?;
 
     validate_tokens(tokens, &decoder)
 }
@@ -150,7 +150,7 @@ fn get_especials() -> HashSet<u8> {
 
 fn validate_tokens(tokens: Tokens, decoder: &Decoder) -> Result<Tokens> {
     if let Some(too_long_encoded_words) = get_too_long_encoded_words(&tokens, decoder) {
-        return Err(LexerError::ParseEncodedWordTooLongError(too_long_encoded_words));
+        return Err(Error::ParseEncodedWordTooLongError(too_long_encoded_words));
     }
 
     Ok(tokens)
@@ -182,7 +182,7 @@ mod tests {
         Decoder,
     };
 
-    use super::{get_parser, LexerError, TooLongEncodedWords};
+    use super::{get_parser, Error, TooLongEncodedWords};
     use chumsky::Parser;
 
     #[test]
@@ -351,7 +351,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            Err(LexerError::ParseEncodedWordTooLongError(
+            Err(Error::ParseEncodedWordTooLongError(
                 TooLongEncodedWords::new(vec![EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),

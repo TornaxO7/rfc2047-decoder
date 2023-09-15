@@ -158,6 +158,7 @@ impl Default for Decoder {
 mod tests {
     /// Here are the main-tests which are listed here:
     /// https://datatracker.ietf.org/doc/html/rfc2047#section-8
+    /// Scroll down until you see the table.
     mod rfc_tests {
         use crate::decode;
 

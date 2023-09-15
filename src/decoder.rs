@@ -162,17 +162,17 @@ mod tests {
         use crate::decode;
 
         #[test]
-        fn example_1() {
+        fn decode_encoded_word_single_char() {
             assert_eq!(decode("=?ISO-8859-1?Q?a?=").unwrap(), "a");
         }
 
         #[test]
-        fn example_2() {
+        fn decode_encoded_word_separated_by_whitespace() {
             assert_eq!(decode("=?ISO-8859-1?Q?a?= b").unwrap(), "a b");
         }
 
         #[test]
-        fn example_3() {
+        fn decode_two_encoded_chars() {
             assert_eq!(
                 decode("=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=").unwrap(),
                 "ab"
@@ -180,7 +180,7 @@ mod tests {
         }
 
         #[test]
-        fn example_4() {
+        fn whitespace_between_two_encoded_words_should_be_ignored() {
             assert_eq!(
                 decode("=?ISO-8859-1?Q?a?=  =?ISO-8859-1?Q?b?=").unwrap(),
                 "ab"
@@ -188,7 +188,7 @@ mod tests {
         }
 
         #[test]
-        fn example_5() {
+        fn whitespace_chars_between_two_encoded_words_should_be_ignored() {
             assert_eq!(
                 decode(
                     "=?ISO-8859-1?Q?a?=               
@@ -200,12 +200,12 @@ mod tests {
         }
 
         #[test]
-        fn example_6() {
+        fn whitespace_encoded_in_encoded_word() {
             assert_eq!(decode("=?ISO-8859-1?Q?a_b?=").unwrap(), "a b");
         }
 
         #[test]
-        fn example_7() {
+        fn ignore_whitespace_between_two_encoded_words_but_not_the_encoded_whitespace() {
             assert_eq!(
                 decode("=?ISO-8859-1?Q?a?= =?ISO-8859-2?Q?_b?=").unwrap(),
                 "a b"

@@ -3,38 +3,133 @@ use thiserror::Error;
 
 use crate::{evaluator, lexer, parser};
 
-#[derive(Error, Debug)]
+/// The possible errors which can occur while parsing the string.
+#[derive(Error, Debug, PartialEq)]
 pub enum Error {
+    /// Symbolises that an error occured in the lexer.
     #[error(transparent)]
     Lexer(#[from] lexer::Error),
+
+    /// Symbolises that an error occured in the parser.
     #[error(transparent)]
     Parser(#[from] parser::Error),
+
+    /// Symbolises that an error occured in the evaluator.
     #[error(transparent)]
     Evaluator(#[from] evaluator::Error),
 }
 
-pub type Result<T> = result::Result<T, Error>;
+/// Determines which strategy should be used if an encoded word isn't encoded as
+/// described in the RFC.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RecoverStrategy {
+    /// Decode the encoded word although it's incorrectly encoded.
+    ///
+    /// # Example
+    /// Take a look to [Decoder#RecoveryStrategy::Decode](Decoder#recoverstrategydecode).
+    Decode,
+
+    /// Skip the incorrectly encoded encoded word.
+    ///
+    /// # Example
+    /// Take a look to [Decoder#RecoveryStrategy::Skip](Decoder#recoverstrategyskip).
+    Skip,
+
+    /// Abort the string-parsing and return an error.
+    ///
+    /// # Example
+    /// Take a look to [Decoder#RecoveryStrategy::Abort](Decoder#recoverstrategyabort-default).
+    Abort,
+}
+
+type Result<T> = result::Result<T, Error>;
 
 /// Represents the decoder builder.
 ///
+/// # Example
 /// ```
-/// let decoder = rfc2047_decoder::Decoder::new().skip_encoded_word_length(true);
+/// use rfc2047_decoder::{Decoder, RecoverStrategy};
+///
+/// let decoder = Decoder::new()
+///                 .too_long_encoded_word_strategy(RecoverStrategy::Skip);
 /// let decoded_str = decoder.decode("=?UTF-8?B?c3Ry?=");
 /// ```
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Decoder {
-    pub skip_encoded_word_length: bool,
+    /// Detemrines which strategy should be used, if the parser encounters
+    /// encoded words which are too longer than allowed in the RFC.
+    pub too_long_encoded_word: RecoverStrategy,
 }
 
 impl Decoder {
-    /// Creates a new decoder builder using default values.
+    /// Equals [Decoder::default].
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Sets option to skip encoded word length verification.
-    pub fn skip_encoded_word_length(mut self, b: bool) -> Self {
-        self.skip_encoded_word_length = b;
+    /// Set the strategy if the decoder finds an encoded word which is too long.
+    ///
+    /// # Examples
+    ///
+    /// Each example uses the same encoded message:
+    /// ```txt
+    /// =?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=
+    /// ```
+    /// which exceeds the maximum length of 75 chars so it's actually invalid.
+    ///
+    /// ## RecoverStrategy::Skip
+    /// Skips the invalid encoded word and parses it as clear text.
+    ///
+    /// ```rust
+    /// use rfc2047_decoder::{Decoder, RecoverStrategy};
+    ///
+    /// let message = "=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=";
+    /// let decoder = Decoder::new()
+    ///                 .too_long_encoded_word_strategy(RecoverStrategy::Skip);
+    ///
+    /// let parsed = decoder.decode(message).unwrap();
+    ///
+    /// // nothing changed!
+    /// assert_eq!(parsed, message);
+    /// ```
+    ///
+    /// ## RecoverStrategy::Decode
+    /// Although the encoded word is invalid, keep decoding it.
+    ///
+    /// ```rust
+    /// use rfc2047_decoder::{Decoder, RecoverStrategy};
+    ///
+    /// let message = "=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=";
+    /// let decoder = Decoder::new()
+    ///                 .too_long_encoded_word_strategy(RecoverStrategy::Decode);
+    ///
+    /// let parsed = decoder.decode(message).unwrap();
+    ///
+    /// // could you decode it? ;)
+    /// let expected_result = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut interdum quam eu facilisis ornare.";
+    ///
+    /// assert_eq!(parsed, expected_result);
+    /// ```
+    ///
+    /// ## RecoverStrategy::Abort (default)
+    /// The parser will return an `Err` and collects all encoded words which are
+    /// too long. You can use them afterwards for error messages for example.
+    ///
+    /// ```rust
+    /// use rfc2047_decoder::{Decoder, RecoverStrategy, Error::{self, Lexer}};
+    /// use rfc2047_decoder::LexerError::ParseEncodedWordTooLongError;
+    /// use rfc2047_decoder::TooLongEncodedWords;
+    ///
+    /// let message = "=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=";
+    /// // `RecoverStrategy::Abort` is the default strategy
+    /// let decoder = Decoder::new();
+    ///
+    /// let parsed = decoder.decode(message);
+    ///
+    /// assert_eq!(parsed, Err(Lexer(ParseEncodedWordTooLongError(TooLongEncodedWords(vec!["=?utf-8?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?B?=".to_string()])))));
+    /// ```
+    pub fn too_long_encoded_word_strategy(mut self, strategy: RecoverStrategy) -> Self {
+        self.too_long_encoded_word = strategy;
         self
     }
 
@@ -48,25 +143,37 @@ impl Decoder {
     }
 }
 
+impl Default for Decoder {
+    /// Returns the decoder with the following default "settings":
+    ///
+    /// - `too_long_encoded_word`: [RecoverStrategy::Abort]
+    fn default() -> Self {
+        Self {
+            too_long_encoded_word: RecoverStrategy::Abort,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     /// Here are the main-tests which are listed here:
     /// https://datatracker.ietf.org/doc/html/rfc2047#section-8
+    /// Scroll down until you see the table.
     mod rfc_tests {
         use crate::decode;
 
         #[test]
-        fn test_example_1() {
+        fn decode_encoded_word_single_char() {
             assert_eq!(decode("=?ISO-8859-1?Q?a?=").unwrap(), "a");
         }
 
         #[test]
-        fn test_example_2() {
+        fn decode_encoded_word_separated_by_whitespace() {
             assert_eq!(decode("=?ISO-8859-1?Q?a?= b").unwrap(), "a b");
         }
 
         #[test]
-        fn test_example_3() {
+        fn decode_two_encoded_chars() {
             assert_eq!(
                 decode("=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=").unwrap(),
                 "ab"
@@ -74,7 +181,7 @@ mod tests {
         }
 
         #[test]
-        fn test_example_4() {
+        fn whitespace_between_two_encoded_words_should_be_ignored() {
             assert_eq!(
                 decode("=?ISO-8859-1?Q?a?=  =?ISO-8859-1?Q?b?=").unwrap(),
                 "ab"
@@ -82,7 +189,7 @@ mod tests {
         }
 
         #[test]
-        fn test_example_5() {
+        fn whitespace_chars_between_two_encoded_words_should_be_ignored() {
             assert_eq!(
                 decode(
                     "=?ISO-8859-1?Q?a?=               
@@ -94,12 +201,12 @@ mod tests {
         }
 
         #[test]
-        fn test_example_6() {
+        fn whitespace_encoded_in_encoded_word() {
             assert_eq!(decode("=?ISO-8859-1?Q?a_b?=").unwrap(), "a b");
         }
 
         #[test]
-        fn test_example_7() {
+        fn ignore_whitespace_between_two_encoded_words_but_not_the_encoded_whitespace() {
             assert_eq!(
                 decode("=?ISO-8859-1?Q?a?= =?ISO-8859-2?Q?_b?=").unwrap(),
                 "a b"
@@ -109,7 +216,7 @@ mod tests {
 
     /// Those are some custom tests
     mod custom_tests {
-        use crate::{decode, Decoder};
+        use crate::decode;
 
         #[test]
         fn clear_empty() {
@@ -192,14 +299,6 @@ mod tests {
             assert_eq!(
                 decode("=?utf-8?B?UG9ydGFsZSBIYWNraW5nVGVhbW==?=").unwrap(),
                 "Portale HackingTeam",
-            );
-        }
-
-        #[test]
-        fn utf8_b64_skip_encoded_word_length() {
-            assert_eq!(
-                Decoder::new().skip_encoded_word_length(true).decode("=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=").unwrap(),
-                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut interdum quam eu facilisis ornare.",
             );
         }
     }

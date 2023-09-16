@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2023-09-16
+
+### Changed
+
+- `lexer::Error` gets the alias `LexerError`
+- `parser::Error` gets the alias `ParserError`
+- `evaluator::Error` gets the alias `EvaluatorError`
+- `Decoder.too_long_encoded_word` has a strategy instead of a `bool`
+
 ## [0.2.2] - 2023-03-29
 
 ### Changed

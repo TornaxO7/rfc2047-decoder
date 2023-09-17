@@ -1,9 +1,10 @@
 use charset::Charset;
 use std::{convert::TryFrom, result};
 
-use crate::lexer::{Token, Tokens};
+use crate::lexer::{Token, Tokens, encoded_word};
 
-#[derive(thiserror::Error, Debug, Clone)]
+/// All errors which the parser can throw.
+#[derive(thiserror::Error, Debug, Clone, PartialEq)]
 pub enum Error {
     #[error("cannot parse encoding: encoding is bigger than a char")]
     ParseEncodingTooBigError,
@@ -60,18 +61,14 @@ pub enum ParsedEncodedWord {
 }
 
 impl ParsedEncodedWord {
-    pub fn convert_encoded_word(
-        charset: Vec<u8>,
-        encoding: Vec<u8>,
-        encoded_text: Vec<u8>,
-    ) -> Result<Self> {
-        let encoding = Encoding::try_from(encoding)?;
-        let charset = Charset::for_label(&charset);
+    pub fn convert_encoded_word(encoded_word: encoded_word::EncodedWord) -> Result<Self> {
+        let encoding = Encoding::try_from(encoded_word.encoding)?;
+        let charset = Charset::for_label(&encoded_word.charset);
 
         Ok(Self::EncodedWord {
             charset,
             encoding,
-            encoded_text,
+            encoded_text: encoded_word.encoded_text,
         })
     }
 }
@@ -86,11 +83,7 @@ fn convert_tokens_to_encoded_words(tokens: Tokens) -> Result<ParsedEncodedWords>
         .into_iter()
         .map(|token: Token| match token {
             Token::ClearText(clear_text) => Ok(ParsedEncodedWord::ClearText(clear_text)),
-            Token::EncodedWord {
-                charset,
-                encoding,
-                encoded_text,
-            } => ParsedEncodedWord::convert_encoded_word(charset, encoding, encoded_text),
+            Token::EncodedWord(encoded_word) => ParsedEncodedWord::convert_encoded_word(encoded_word),
         })
         .collect()
 }

@@ -8,7 +8,8 @@ use thiserror::Error;
 
 use crate::parser::{ClearText, Encoding, ParsedEncodedWord, ParsedEncodedWords};
 
-#[derive(Error, Debug)]
+/// All errors which the evaluator can throw.
+#[derive(Error, Debug, PartialEq)]
 pub enum Error {
     #[error(transparent)]
     DecodeUtf8Error(#[from] string::FromUtf8Error),

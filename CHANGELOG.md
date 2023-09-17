@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2023-09-17
+- extending docs about some structs
+- fixing `Display` implementation of `TooLongEncodedWord`
+
 ## [1.0.0] - 2023-09-16
 
 ### Changed

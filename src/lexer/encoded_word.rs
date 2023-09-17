@@ -55,8 +55,8 @@ impl EncodedWord {
 impl Display for EncodedWord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let charset = String::from_utf8(self.charset.clone()).unwrap();
-        let encoding = String::from_utf8(self.encoded_text.clone()).unwrap();
-        let encoded_text = String::from_utf8(self.encoding.clone()).unwrap();
+        let encoding = String::from_utf8(self.encoding.clone()).unwrap();
+        let encoded_text = String::from_utf8(self.encoded_text.clone()).unwrap();
 
         write!(f, "=?{}?{}?{}?=", charset, encoding, encoded_text)
     }

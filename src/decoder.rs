@@ -128,7 +128,7 @@ impl Decoder {
     ///
     /// let parsed = decoder.decode(message);
     ///
-    /// assert_eq!(parsed, Err(Lexer(ParseEncodedWordTooLongError(TooLongEncodedWords(vec!["=?utf-8?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?B?=".to_string()])))));
+    /// assert_eq!(parsed, Err(Lexer(ParseEncodedWordTooLongError(TooLongEncodedWords(vec!["=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=".to_string()])))));
     /// ```
     pub fn too_long_encoded_word_strategy(mut self, strategy: RecoverStrategy) -> Self {
         self.too_long_encoded_word = strategy;
@@ -162,7 +162,7 @@ mod tests {
     /// https://datatracker.ietf.org/doc/html/rfc2047#section-8
     /// Scroll down until you see the table.
     mod rfc_tests {
-        use crate::decode;
+        use crate::{decode, LexerError};
 
         #[test]
         fn decode_encoded_word_single_char() {
@@ -218,7 +218,7 @@ mod tests {
 
     /// Those are some custom tests
     mod custom_tests {
-        use crate::decode;
+        use crate::{decode, LexerError};
 
         #[test]
         fn clear_empty() {

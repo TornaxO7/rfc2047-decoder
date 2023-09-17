@@ -13,6 +13,27 @@ const SPACE: u8 = b' ';
 
 /// A helper struct which implements [std::fmt::Display] for `Vec<String>` and
 /// which contains the encoded words which are too long as a `String`.
+///
+/// # Example
+/// ```
+/// use rfc2047_decoder::{self, decode, RecoverStrategy, LexerError};
+///
+/// // the first string and the third string are more than 75 characters, hence
+/// // they are actually invalid encoded words
+/// let message = concat![
+///     "=?utf-8?B?bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb==?=",
+///     "among us",
+///     "=?utf-8?B?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa==?=",
+/// ];
+
+/// let result = decode(message).unwrap_err();
+/// if let rfc2047_decoder::Error::Lexer(LexerError::ParseEncodedWordTooLongError(invalid_encoded_words)) = result {
+///     assert_eq!(invalid_encoded_words.0[0], "=?utf-8?B?bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb==?=");
+///     assert_eq!(invalid_encoded_words.0[1], "=?utf-8?B?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa==?=");
+/// } else {
+///     assert!(false);
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TooLongEncodedWords(pub Vec<String>);
 
@@ -178,7 +199,7 @@ fn get_too_long_encoded_words(tokens: &Tokens, decoder: &Decoder) -> Option<TooL
 #[cfg(test)]
 mod tests {
     use crate::{
-        lexer::{encoded_word::EncodedWord, Token, run},
+        lexer::{encoded_word::EncodedWord, run, Token},
         Decoder,
     };
 

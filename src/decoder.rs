@@ -162,7 +162,7 @@ mod tests {
     /// https://datatracker.ietf.org/doc/html/rfc2047#section-8
     /// Scroll down until you see the table.
     mod rfc_tests {
-        use crate::{decode, LexerError};
+        use crate::decode;
 
         #[test]
         fn decode_encoded_word_single_char() {
@@ -218,7 +218,7 @@ mod tests {
 
     /// Those are some custom tests
     mod custom_tests {
-        use crate::{decode, LexerError};
+        use crate::decode;
 
         #[test]
         fn clear_empty() {

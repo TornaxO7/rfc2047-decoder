@@ -19,7 +19,7 @@ fn main() {
     // using the decoder builder (custom options)
     assert_eq!(
         rfc2047_decoder::Decoder::new()
-            .skip_encoded_word_length(true)
+            .too_long_encoded_word_strategy(rfc2047_decoder::RecoverStrategy::Skip)
             .decode(encoded_str.as_bytes())
             .unwrap(),
         decoded_str

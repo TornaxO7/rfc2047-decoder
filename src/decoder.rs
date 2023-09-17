@@ -52,7 +52,9 @@ type Result<T> = result::Result<T, Error>;
 ///
 /// let decoder = Decoder::new()
 ///                 .too_long_encoded_word_strategy(RecoverStrategy::Skip);
-/// let decoded_str = decoder.decode("=?UTF-8?B?c3Ry?=");
+/// let decoded_str = decoder.decode("=?UTF-8?B?c3Ry?=").unwrap();
+///
+/// assert_eq!(decoded_str, "str");
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Decoder {

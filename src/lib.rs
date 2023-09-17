@@ -10,15 +10,15 @@
 //! to use this crate.
 
 mod decoder;
-pub use decoder::{Decoder, RecoverStrategy, Error};
+pub use decoder::{Decoder, Error, RecoverStrategy};
 
 mod evaluator;
 mod lexer;
 mod parser;
 
-pub use lexer::{TooLongEncodedWords, Error as LexerError};
-pub use parser::Error as ParserError;
 pub use evaluator::Error as EvaluatorError;
+pub use lexer::{Error as LexerError, TooLongEncodedWords};
+pub use parser::Error as ParserError;
 
 /// Decodes the given RFC 2047 MIME Message Header encoded string
 /// using a default decoder.

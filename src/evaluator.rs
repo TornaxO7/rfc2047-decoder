@@ -1,6 +1,7 @@
 use base64::{
     alphabet,
-    engine::{GeneralPurpose, GeneralPurposeConfig}, Engine,
+    engine::{GeneralPurpose, GeneralPurposeConfig},
+    Engine,
 };
 use charset::Charset;
 use std::{result, string};

@@ -1,7 +1,7 @@
 use charset::Charset;
 use std::{convert::TryFrom, result};
 
-use crate::lexer::{Token, Tokens, encoded_word};
+use crate::lexer::{encoded_word, Token, Tokens};
 
 /// All errors which the parser can throw.
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]
@@ -83,7 +83,9 @@ fn convert_tokens_to_encoded_words(tokens: Tokens) -> Result<ParsedEncodedWords>
         .into_iter()
         .map(|token: Token| match token {
             Token::ClearText(clear_text) => Ok(ParsedEncodedWord::ClearText(clear_text)),
-            Token::EncodedWord(encoded_word) => ParsedEncodedWord::convert_encoded_word(encoded_word),
+            Token::EncodedWord(encoded_word) => {
+                ParsedEncodedWord::convert_encoded_word(encoded_word)
+            }
         })
         .collect()
 }

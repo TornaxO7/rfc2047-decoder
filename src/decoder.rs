@@ -52,7 +52,9 @@ type Result<T> = result::Result<T, Error>;
 ///
 /// let decoder = Decoder::new()
 ///                 .too_long_encoded_word_strategy(RecoverStrategy::Skip);
-/// let decoded_str = decoder.decode("=?UTF-8?B?c3Ry?=");
+/// let decoded_str = decoder.decode("=?UTF-8?B?c3Ry?=").unwrap();
+///
+/// assert_eq!(decoded_str, "str");
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Decoder {
@@ -126,7 +128,7 @@ impl Decoder {
     ///
     /// let parsed = decoder.decode(message);
     ///
-    /// assert_eq!(parsed, Err(Lexer(ParseEncodedWordTooLongError(TooLongEncodedWords(vec!["=?utf-8?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?B?=".to_string()])))));
+    /// assert_eq!(parsed, Err(Lexer(ParseEncodedWordTooLongError(TooLongEncodedWords(vec!["=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=".to_string()])))));
     /// ```
     pub fn too_long_encoded_word_strategy(mut self, strategy: RecoverStrategy) -> Self {
         self.too_long_encoded_word = strategy;

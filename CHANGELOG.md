@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Renaming the following enum values:
+  - `LexerError::ParseBytesError`              => `LexerError::InvalidBytes`
+  - `LexerError::ParseEncodedWordTooLongError` => `LexerError::EncodedWordTooLong`
+
+  - `ParserError::ParseEncodingTooBigError`    => `ParserError::EncodingTooBig`
+  - `ParserError::ParseEncodingEmptyError`     => `ParserError::EncodingEmpty`
+  - `ParserError::ParseEncodingError`          => `ParserError::UnexpectedeEncoding`
+
+  - `EvaluatorError::DecodeUtf8Error`            => `EvaluatorError::DecodeUtf8`
+  - `EvaluatorError::DecodeBase64Error`          => `EvaluatorError::DecodeBase64`
+  - `EvaluatorError::DecodeQuotedPrintableError` => `EvaluatorError::DecodeQuotedPrintable`
+
 ## [1.0.1] - 2023-09-17
 - extending docs about some structs
 - fixing `Display` implementation of `TooLongEncodedWord`

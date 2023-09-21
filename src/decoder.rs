@@ -119,16 +119,17 @@ impl Decoder {
     ///
     /// ```rust
     /// use rfc2047_decoder::{Decoder, RecoverStrategy, Error::{self, Lexer}};
-    /// use rfc2047_decoder::LexerError::ParseEncodedWordTooLongError;
+    /// use rfc2047_decoder::LexerError::EncodedWordTooLong;
     /// use rfc2047_decoder::TooLongEncodedWords;
     ///
-    /// let message = "=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=";
+    /// let message = "=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?="
+    ///     .to_string();
     /// // `RecoverStrategy::Abort` is the default strategy
     /// let decoder = Decoder::new();
     ///
-    /// let parsed = decoder.decode(message);
+    /// let parsed = decoder.decode(message.clone());
     ///
-    /// assert_eq!(parsed, Err(Lexer(ParseEncodedWordTooLongError(TooLongEncodedWords(vec!["=?utf-8?B?TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gVXQgaW50ZXJkdW0gcXVhbSBldSBmYWNpbGlzaXMgb3JuYXJlLg==?=".to_string()])))));
+    /// assert_eq!(parsed, Err(Lexer(EncodedWordTooLong(TooLongEncodedWords(vec![message])))));
     /// ```
     pub fn too_long_encoded_word_strategy(mut self, strategy: RecoverStrategy) -> Self {
         self.too_long_encoded_word = strategy;

@@ -27,7 +27,7 @@ const SPACE: u8 = b' ';
 /// ];
 
 /// let result = decode(message).unwrap_err();
-/// if let rfc2047_decoder::Error::Lexer(LexerError::ParseEncodedWordTooLongError(invalid_encoded_words)) = result {
+/// if let rfc2047_decoder::Error::Lexer(LexerError::EncodedWordTooLong(invalid_encoded_words)) = result {
 ///     assert_eq!(invalid_encoded_words.0[0], "=?utf-8?B?bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb==?=");
 ///     assert_eq!(invalid_encoded_words.0[1], "=?utf-8?B?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa==?=");
 /// } else {
@@ -63,9 +63,9 @@ impl Display for TooLongEncodedWords {
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum Error {
     #[error("cannot parse bytes into tokens")]
-    ParseBytesError(Vec<Simple<u8>>),
+    InvalidBytes(Vec<Simple<u8>>),
     #[error("Cannot parse the following encoded words, because they are too long: {0}")]
-    ParseEncodedWordTooLongError(TooLongEncodedWords),
+    EncodedWordTooLong(TooLongEncodedWords),
 }
 
 type Result<T> = result::Result<T, Error>;
@@ -91,7 +91,7 @@ impl Token {
 pub fn run(encoded_bytes: &[u8], decoder: Decoder) -> Result<Tokens> {
     let tokens = get_parser(&decoder)
         .parse(encoded_bytes)
-        .map_err(Error::ParseBytesError)?;
+        .map_err(Error::InvalidBytes)?;
 
     validate_tokens(tokens, &decoder)
 }
@@ -171,7 +171,7 @@ fn get_especials() -> HashSet<u8> {
 
 fn validate_tokens(tokens: Tokens, decoder: &Decoder) -> Result<Tokens> {
     if let Some(too_long_encoded_words) = get_too_long_encoded_words(&tokens, decoder) {
-        return Err(Error::ParseEncodedWordTooLongError(too_long_encoded_words));
+        return Err(Error::EncodedWordTooLong(too_long_encoded_words));
     }
 
     Ok(tokens)
@@ -372,7 +372,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            Err(Error::ParseEncodedWordTooLongError(
+            Err(Error::EncodedWordTooLong(
                 TooLongEncodedWords::new(vec![EncodedWord {
                     charset: "ISO-8859-1".as_bytes().to_vec(),
                     encoding: "Q".as_bytes().to_vec(),

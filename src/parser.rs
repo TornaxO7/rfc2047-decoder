@@ -7,11 +7,11 @@ use crate::lexer::{encoded_word, Token, Tokens};
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]
 pub enum Error {
     #[error("cannot parse encoding: encoding is bigger than a char")]
-    ParseEncodingTooBigError,
+    EncodingTooBig,
     #[error("cannot parse encoding: encoding is empty")]
-    ParseEncodingEmptyError,
+    EncodingEmpty,
     #[error("cannot parse encoding {0}: B or Q is expected")]
-    ParseEncodingError(char),
+    UnexpectedeEncoding(char),
 }
 
 type Result<T> = result::Result<T, Error>;
@@ -36,16 +36,16 @@ impl TryFrom<Vec<u8>> for Encoding {
 
     fn try_from(token: Vec<u8>) -> Result<Self> {
         if token.len() > Self::MAX_LENGTH {
-            return Err(Error::ParseEncodingTooBigError);
+            return Err(Error::EncodingTooBig);
         }
 
-        let encoding = token.first().ok_or(Error::ParseEncodingEmptyError)?;
+        let encoding = token.first().ok_or(Error::EncodingEmpty)?;
         let encoding = *encoding as char;
 
         match encoding.to_ascii_lowercase() {
             Encoding::Q_CHAR => Ok(Self::Q),
             Encoding::B_CHAR => Ok(Self::B),
-            _ => Err(Error::ParseEncodingError(encoding)),
+            _ => Err(Error::UnexpectedeEncoding(encoding)),
         }
     }
 }

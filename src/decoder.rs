@@ -58,8 +58,8 @@ type Result<T> = result::Result<T, Error>;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Decoder {
-    /// Detemrines which strategy should be used, if the parser encounters
-    /// encoded words which are too longer than allowed in the RFC.
+    /// Determines which strategy should be used, if the parser encounters
+    /// encoded words which are longer than allowed in the RFC (it's longer than 75 chars).
     pub too_long_encoded_word: RecoverStrategy,
 }
 

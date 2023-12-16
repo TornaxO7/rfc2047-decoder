@@ -4,3 +4,5 @@ updates:
     package-ecosystem: cargo
     schedule:
       interval: weekly
+    reviewers:
+      - "TornaxO7"

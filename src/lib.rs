@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/rfc2047-decoder/1.0.3")]
 //! # Introduction
 //! This crate provides a [Decoder] and the function [decode], in order to decode
 //! encoded words as described in the [RFC 2047].

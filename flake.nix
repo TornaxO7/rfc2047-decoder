@@ -26,7 +26,7 @@
         in
         {
           default = pkgs.mkShell {
-            packages = [ rust-toolchain ];
+            packages = with pkgs; [ cargo-release ] ++ [ rust-toolchain ];
           };
         });
     };

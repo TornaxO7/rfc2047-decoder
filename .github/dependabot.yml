@@ -1,8 +1,0 @@
-version: 2
-updates:
-  - directory: /
-    package-ecosystem: cargo
-    schedule:
-      interval: weekly
-    reviewers:
-      - "TornaxO7"

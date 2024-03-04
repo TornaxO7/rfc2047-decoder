@@ -16,7 +16,7 @@ readme = "README.md"
 name = "rfc2047_decoder"
 
 [dependencies]
-base64 = "0.21"
+base64 = "0.22"
 charset = "0.1"
 chumsky = "0.9"
 memchr = "2.5"

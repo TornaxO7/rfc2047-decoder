@@ -97,7 +97,7 @@ mod tests {
     use crate::{
         lexer,
         parser::{self, Encoding, ParsedEncodedWord},
-        Decoder,
+        RecoverStrategy,
     };
 
     /// Example taken from:
@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn test_parse1() {
         let message = "=?US-ASCII?Q?Keith_Moore?=".as_bytes();
-        let tokens = lexer::run(&message, Decoder::new()).unwrap();
+        let tokens = lexer::run(&message, RecoverStrategy::Abort).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn test_parse2() {
         let message = "=?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?=".as_bytes();
-        let tokens = lexer::run(&message, Decoder::new()).unwrap();
+        let tokens = lexer::run(&message, RecoverStrategy::Abort).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {
@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn test_parse3() {
         let message = "=?ISO-8859-1?Q?Andr=E9?=".as_bytes();
-        let tokens = lexer::run(&message, Decoder::new()).unwrap();
+        let tokens = lexer::run(&message, RecoverStrategy::Abort).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn test_parse4() {
         let message = "=?ISO-8859-1?B?SWYgeW91IGNhbiByZWFkIHRoaXMgeW8=?=".as_bytes();
-        let tokens = lexer::run(&message, Decoder::new()).unwrap();
+        let tokens = lexer::run(&message, RecoverStrategy::Abort).unwrap();
         let parsed = parser::run(tokens).unwrap();
 
         let expected = vec![ParsedEncodedWord::EncodedWord {

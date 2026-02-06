@@ -1,7 +1,5 @@
-use std::result;
-use thiserror::Error;
-
 use crate::{evaluator, lexer, parser};
+use thiserror::Error;
 
 /// The possible errors which can occur while parsing the string.
 #[derive(Error, Debug, PartialEq)]
@@ -41,8 +39,6 @@ pub enum RecoverStrategy {
     /// Take a look to [Decoder#RecoveryStrategy::Abort](Decoder#recoverstrategyabort-default).
     Abort,
 }
-
-type Result<T> = result::Result<T, Error>;
 
 /// Represents the decoder builder.
 ///
@@ -136,8 +132,8 @@ impl Decoder {
     }
 
     /// Decodes the given RFC 2047 MIME Message Header encoded string.
-    pub fn decode<T: AsRef<[u8]>>(self, encoded_str: T) -> Result<String> {
-        let text_tokens = lexer::run(encoded_str.as_ref(), self)?;
+    pub fn decode<T: AsRef<[u8]>>(self, encoded_str: T) -> Result<String, Error> {
+        let text_tokens = lexer::run(encoded_str.as_ref(), self.too_long_encoded_word)?;
         let parsed_text = parser::run(text_tokens)?;
         let evaluated_string = evaluator::run(parsed_text)?;
 

@@ -1,10 +1,10 @@
 pub mod encoded_word;
 
-use chumsky::{prelude::Simple, text::whitespace, Parser};
-use std::{collections::HashSet, fmt::Display, result};
+use chumsky::{extra, prelude::*, text::whitespace, Parser};
+use std::{collections::HashSet, fmt::Display};
 use thiserror::Error;
 
-use crate::{decoder::RecoverStrategy, Decoder};
+use crate::decoder::RecoverStrategy;
 
 use self::encoded_word::EncodedWord;
 
@@ -62,13 +62,11 @@ impl Display for TooLongEncodedWords {
 /// All errors which the lexer can throw.
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum Error {
-    #[error("cannot parse bytes into tokens")]
-    ParseBytesError(Vec<Simple<u8>>),
+    #[error("cannot parse bytes into tokens: {0}")]
+    ParseBytesError(String),
     #[error("Cannot parse the following encoded words, because they are too long: {0}")]
     ParseEncodedWordTooLongError(TooLongEncodedWords),
 }
-
-type Result<T> = result::Result<T, Error>;
 
 pub type Tokens = Vec<Token>;
 
@@ -88,53 +86,69 @@ impl Token {
     }
 }
 
-pub fn run(encoded_bytes: &[u8], decoder: Decoder) -> Result<Tokens> {
-    let tokens = get_parser(&decoder)
+pub fn run(encoded_bytes: &[u8], strategy: RecoverStrategy) -> Result<Tokens, Error> {
+    let tokens = get_parser(strategy)
         .parse(encoded_bytes)
-        .map_err(Error::ParseBytesError)?;
+        .into_result()
+        .map_err(|err| {
+            let mut msg = String::new();
 
-    validate_tokens(tokens, &decoder)
+            if !err.is_empty() {
+                for e in err {
+                    msg.push_str(&format!("{}\n", e));
+                }
+            }
+
+            Error::ParseBytesError(msg)
+        })?;
+
+    validate_tokens(tokens, strategy)
 }
 
-fn get_parser(decoder: &Decoder) -> impl Parser<u8, Tokens, Error = Simple<u8>> {
-    use chumsky::prelude::*;
-
+fn get_parser<'src>(
+    strategy: RecoverStrategy,
+) -> impl Parser<'src, &'src [u8], Tokens, extra::Err<Simple<'src, u8>>> {
     let encoded_words_in_a_row = {
         let following_encoded_word =
-            whitespace().ignore_then(encoded_word_parser(decoder).rewind());
-        encoded_word_parser(decoder).then_ignore(following_encoded_word)
+            whitespace().ignore_then(encoded_word_parser(strategy).rewind());
+        encoded_word_parser(strategy).then_ignore(following_encoded_word)
     };
 
-    let single_encoded_word = encoded_word_parser(decoder);
-    let single_clear_text = clear_text_parser(decoder);
+    let single_encoded_word = encoded_word_parser(strategy);
+    let single_clear_text = clear_text_parser(strategy);
 
     encoded_words_in_a_row
         .or(single_encoded_word)
         .or(single_clear_text)
         .repeated()
+        .collect()
 }
 
-fn clear_text_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simple<u8>> {
-    use chumsky::prelude::*;
-
-    const DEFAULT_EMPTY_INPUT_ERROR_MESSAGE: &str = "got empty input";
-
-    take_until(encoded_word_parser(decoder).rewind().ignored().or(end())).try_map(
-        |(chars, ()), span| {
+fn clear_text_parser<'src>(
+    skip_encoded_word_length: RecoverStrategy,
+) -> impl Parser<'src, &'src [u8], Token, extra::Err<Simple<'src, u8>>> {
+    any()
+        .and_is(
+            encoded_word_parser(skip_encoded_word_length)
+                .rewind()
+                .ignored()
+                .or(end())
+                .not(),
+        )
+        .repeated()
+        .collect::<Vec<u8>>()
+        .try_map(|chars, span| {
             if chars.is_empty() {
-                Err(Simple::custom(span, DEFAULT_EMPTY_INPUT_ERROR_MESSAGE))
+                Err(Simple::new(None, span))
             } else {
                 Ok(Token::ClearText(chars))
             }
-        },
-    )
+        })
 }
 
-fn encoded_word_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simple<u8>> {
-    use chumsky::prelude::*;
-
-    let skip_encoded_word_length = decoder.too_long_encoded_word;
-
+fn encoded_word_parser<'src>(
+    skip_encoded_word_length: RecoverStrategy,
+) -> impl Parser<'src, &'src [u8], Token, extra::Err<Simple<'src, u8>>> {
     let convert_to_token = move |encoded_word: EncodedWord| {
         if encoded_word.len() > encoded_word::MAX_LENGTH
             && skip_encoded_word_length == RecoverStrategy::Skip
@@ -147,10 +161,11 @@ fn encoded_word_parser(decoder: &Decoder) -> impl Parser<u8, Token, Error = Simp
 
     let is_especial = |c: u8| get_especials().contains(&c);
 
-    let token = filter(move |&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
+    let token = any().filter(move |&c: &u8| c != SPACE && !c.is_ascii_control() && !is_especial(c));
     let charset = token.repeated().at_least(1).collect::<Vec<u8>>();
     let encoding = token.repeated().at_least(1).collect::<Vec<u8>>();
-    let encoded_text = filter(|&c: &u8| c != QUESTION_MARK && c != SPACE)
+    let encoded_text = any()
+        .filter(|&c: &u8| c != QUESTION_MARK && c != SPACE)
         .repeated()
         .collect::<Vec<u8>>();
 
@@ -169,16 +184,18 @@ fn get_especials() -> HashSet<u8> {
     "()<>@,;:/[]?.=".bytes().collect()
 }
 
-fn validate_tokens(tokens: Tokens, decoder: &Decoder) -> Result<Tokens> {
-    if let Some(too_long_encoded_words) = get_too_long_encoded_words(&tokens, decoder) {
+fn validate_tokens(tokens: Tokens, strategy: RecoverStrategy) -> Result<Tokens, Error> {
+    if let Some(too_long_encoded_words) = get_too_long_encoded_words(&tokens, strategy) {
         return Err(Error::ParseEncodedWordTooLongError(too_long_encoded_words));
     }
 
     Ok(tokens)
 }
 
-fn get_too_long_encoded_words(tokens: &Tokens, decoder: &Decoder) -> Option<TooLongEncodedWords> {
-    let strategy = decoder.too_long_encoded_word;
+fn get_too_long_encoded_words(
+    tokens: &Tokens,
+    strategy: RecoverStrategy,
+) -> Option<TooLongEncodedWords> {
     let mut too_long_encoded_words: Vec<String> = Vec::new();
 
     for token in tokens.iter() {
@@ -199,16 +216,14 @@ fn get_too_long_encoded_words(tokens: &Tokens, decoder: &Decoder) -> Option<TooL
 #[cfg(test)]
 mod tests {
     use crate::{
-        lexer::{encoded_word::EncodedWord, run, Token},
-        Decoder,
+        lexer::{encoded_word::EncodedWord, get_parser, run, Error, Token, TooLongEncodedWords},
+        RecoverStrategy,
     };
-
-    use super::{get_parser, Error, TooLongEncodedWords};
     use chumsky::Parser;
 
     #[test]
     fn encoded_word() {
-        let parser = get_parser(&Decoder::new());
+        let parser = get_parser(RecoverStrategy::Abort);
         let message = "=?ISO-8859-1?Q?Yeet?=".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -225,7 +240,7 @@ mod tests {
 
     #[test]
     fn clear_text() {
-        let parser = get_parser(&Decoder::new());
+        let parser = get_parser(RecoverStrategy::Abort);
         let message = "I use Arch by the way".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -242,7 +257,7 @@ mod tests {
     // https://datatracker.ietf.org/doc/html/rfc2047#section-8
     #[test]
     fn encoded_from_1() {
-        let parser = get_parser(&Decoder::new());
+        let parser = get_parser(RecoverStrategy::Abort);
         let message = "=?ISO-8859-1?Q?a?=".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -260,7 +275,7 @@ mod tests {
     // see encoded_from_1
     #[test]
     fn encoded_from_2() {
-        let parser = get_parser(&Decoder::new());
+        let parser = get_parser(RecoverStrategy::Abort);
         let message = "=?ISO-8859-1?Q?a?= b".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -281,7 +296,7 @@ mod tests {
     // see encoded_from_1
     #[test]
     fn encoded_from_3() {
-        let parser = get_parser(&Decoder::new());
+        let parser = get_parser(RecoverStrategy::Abort);
         let message = "=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -307,7 +322,7 @@ mod tests {
     /// See: https://datatracker.ietf.org/doc/html/rfc2047#section-8
     #[test]
     fn multiple_encoded_words() {
-        let parser = get_parser(&Decoder::new());
+        let parser = get_parser(RecoverStrategy::Abort);
         let message = "=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?= =?ISO-8859-1?Q?c?=".as_bytes();
 
         let parsed = parser.parse(message).unwrap();
@@ -336,7 +351,7 @@ mod tests {
 
     #[test]
     fn ignore_mutiple_spaces_between_encoded_words() {
-        let parser = get_parser(&Decoder::new());
+        let parser = get_parser(RecoverStrategy::Abort);
         let message =
             "=?ISO-8859-1?Q?a?=                               =?ISO-8859-1?Q?b?=".as_bytes();
 
@@ -368,7 +383,7 @@ mod tests {
         let message =
             "=?ISO-8859-1?Q?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?="
                 .as_bytes();
-        let parsed = run(message, Decoder::new());
+        let parsed = run(message, RecoverStrategy::Abort);
 
         assert_eq!(
             parsed,
@@ -387,7 +402,7 @@ mod tests {
 
     #[test]
     fn encoded_word_has_especials() {
-        let parser = get_parser(&Decoder::new());
+        let parser = get_parser(RecoverStrategy::Abort);
         let message = "=?ISO-8859-1(?Q?a?=".as_bytes();
         let parsed = parser.parse(message).unwrap();
 

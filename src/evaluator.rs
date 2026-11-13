@@ -39,12 +39,27 @@ fn decode_quoted_printable(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
     const SPACE: u8 = b' ';
     const UNDERSCORE: u8 = b'_';
 
-    let encoded_bytes = encoded_bytes
+    // Appended after the encoded text so that the quoted-printable decoder
+    // cannot treat a significant trailing space as the end of the line. It is
+    // not a hex digit, so it can never complete a malformed trailing `=X`
+    // escape either.
+    const SENTINEL: u8 = b'X';
+
+    let mut encoded_bytes = encoded_bytes
         .iter()
         .map(|b| if *b == UNDERSCORE { SPACE } else { *b })
         .collect::<Vec<_>>();
 
-    let decoded_bytes = quoted_printable::decode(encoded_bytes, parse_mode)?;
+    // `quoted_printable::decode` strips trailing whitespace, which is correct
+    // for quoted-printable bodies but not for RFC 2047 Q-encoded words: a
+    // space at the end of the encoded word (`_` or `=20`) is significant
+    // (RFC 2047 §4.2). Adjacent encoded words are concatenated without the
+    // whitespace that separates them, so a stripped space silently joins two
+    // words together.
+    encoded_bytes.push(SENTINEL);
+
+    let mut decoded_bytes = quoted_printable::decode(encoded_bytes, parse_mode)?;
+    decoded_bytes.pop();
 
     Ok(decoded_bytes)
 }

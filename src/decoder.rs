@@ -245,6 +245,53 @@ mod tests {
         }
 
         #[test]
+        fn utf8_qs_with_trailing_space() {
+            assert_eq!(
+                decode("=?utf8?q?str_with_spaces_?=").unwrap(),
+                "str with spaces "
+            );
+            assert_eq!(
+                decode("=?utf8?q?str_with_spaces=20?=").unwrap(),
+                "str with spaces "
+            );
+        }
+
+        /// A space encoded at the end of an encoded word is significant
+        /// (RFC 2047 §4.2). The whitespace *between* two adjacent encoded
+        /// words is ignored (§6.2), so dropping it joins the words.
+        #[test]
+        fn utf8_qs_trailing_space_between_encoded_words() {
+            assert_eq!(
+                decode("=?utf8?q?hello_?= =?utf8?q?world?=").unwrap(),
+                "hello world"
+            );
+            assert_eq!(
+                decode("=?utf8?q?hello=20?= =?utf8?q?world?=").unwrap(),
+                "hello world"
+            );
+        }
+
+        /// Regression test mirroring a header that a mail client split over
+        /// several encoded words. Four of them end with an encoded space, and
+        /// losing those spaces would turn `Пример: Обновить список иконок в
+        /// окне` into `Пример:Обновитьсписокиконокв окне`.
+        #[test]
+        fn utf8_qs_multiple_trailing_spaces() {
+            let header = concat!(
+                "=?UTF-8?Q?=D0=9F=D1=80=D0=B8=D0=BC=D0=B5=D1=80:_?= ",
+                "=?UTF-8?Q?=D0=9E=D0=B1=D0=BD=D0=BE=D0=B2=D0=B8=D1=82=D1=8C_?= ",
+                "=?UTF-8?Q?=D1=81=D0=BF=D0=B8=D1=81=D0=BE=D0=BA_?= ",
+                "=?UTF-8?Q?=D0=B8=D0=BA=D0=BE=D0=BD=D0=BE=D0=BA_?= ",
+                "=?UTF-8?Q?=D0=B2_=D0=BE=D0=BA=D0=BD=D0=B5?=",
+            );
+
+            assert_eq!(
+                decode(header).unwrap(),
+                "Пример: Обновить список иконок в окне"
+            );
+        }
+
+        #[test]
         fn utf8_qs_with_spec_chars() {
             assert_eq!(
                 decode("=?utf8?q?str_with_special_=C3=A7h=C3=A0r=C3=9F?=").unwrap(),

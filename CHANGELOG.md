@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A space encoded at the end of a Q-encoded word (`_` or `=20`) is no longer
+  dropped. It is significant (RFC 2047 §4.2), and since the whitespace between
+  two adjacent encoded words is ignored (§6.2), dropping it joined the two
+  words: `=?utf-8?q?hello_?= =?utf-8?q?world?=` decoded to `helloworld`
+  instead of `hello world`.
+
 ## [1.0.3] - 2023-12-23
 
 - Fix versioning

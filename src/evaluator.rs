@@ -38,7 +38,6 @@ fn decode_quoted_printable(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
 
     const SPACE: u8 = b' ';
     const UNDERSCORE: u8 = b'_';
-    const SOFT_LINE_BREAK: u8 = b'=';
 
     // Appended after the encoded text so that the quoted-printable decoder
     // cannot treat a significant trailing space as the end of the line. It is
@@ -57,12 +56,6 @@ fn decode_quoted_printable(encoded_bytes: Vec<u8>) -> Result<Vec<u8>> {
     // (RFC 2047 §4.2). Adjacent encoded words are concatenated without the
     // whitespace that separates them, so a stripped space silently joins two
     // words together.
-    if encoded_bytes.last() == Some(&SOFT_LINE_BREAK) {
-        // A lone trailing `=` is a soft line break, not a significant space.
-        // Appending the sentinel would turn it into a malformed escape.
-        return Ok(quoted_printable::decode(encoded_bytes, parse_mode)?);
-    }
-
     encoded_bytes.push(SENTINEL);
 
     let mut decoded_bytes = quoted_printable::decode(encoded_bytes, parse_mode)?;

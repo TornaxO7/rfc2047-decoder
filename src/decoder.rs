@@ -299,5 +299,15 @@ mod tests {
                 "Portale HackingTeam",
             );
         }
+
+        #[test]
+        fn charset_with_rfc2231_language_tag() {
+            assert_eq!(decode("=?UTF-8*en?Q?Gr=C3=BC=C3=9Fe?=").unwrap(), "Grüße");
+            assert_eq!(decode("=?ISO-8859-1*fr?B?aOlsbG8=?=").unwrap(), "héllo");
+            assert_eq!(
+                decode("=?US-ASCII*EN?Q?Keith_Moore?= =?utf-8*de-DE?b?w7Y=?=").unwrap(),
+                "Keith Mooreö"
+            );
+        }
     }
 }

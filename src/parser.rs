@@ -63,7 +63,14 @@ pub enum ParsedEncodedWord {
 impl ParsedEncodedWord {
     pub fn convert_encoded_word(encoded_word: encoded_word::EncodedWord) -> Result<Self> {
         let encoding = Encoding::try_from(encoded_word.encoding)?;
-        let charset = Charset::for_label(&encoded_word.charset);
+        // RFC 2231 section 5 lets the charset carry a language tag after a `*`
+        // (`=?UTF-8*en?Q?...?=`), which is not part of the charset name.
+        let charset_name = encoded_word
+            .charset
+            .split(|&byte| byte == b'*')
+            .next()
+            .unwrap_or_default();
+        let charset = Charset::for_label(charset_name);
 
         Ok(Self::EncodedWord {
             charset,
